@@ -107,7 +107,7 @@ local function UpdateAchInfo()
 		AchRankPath = "Interface\\ICONS\\Achievement_PVP_P_15"
 		KillsLeft = 100000 - HKills
 	elseif 100000 <= HKills and HKills < 250000 then
-		AchRankPath = "Interface\\ICONS\\Achievement_PVP_P_16"
+		AchRankPath = "Interface\\ICONS\\Achievement_PVP_P_250K"
 		KillsLeft = 250000 - HKills
 	elseif 250000 <= HKills then
 		AchRankPath = "Interface\\ICONS\\Achievement_BG_KillFlagCarriers_grabFlag_CapIt"

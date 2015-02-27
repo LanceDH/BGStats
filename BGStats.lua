@@ -36,6 +36,40 @@ local mainInset = 3
 local _BGPlayerList = {}
 
 
+local AnchorTable = {options = {["other"] = "Other"
+						,["UIParent"] = "Screen"
+
+						}
+				, order = {"none"
+						,"UIParent"
+
+						}
+}
+
+local AnchorLocationTable = {options = {["Bottom"] = "Bottom"
+						,["Bottom left"] = "Bottom left"
+						,["Bottom right"] = "Bottom right"
+						,["Center"] = "Center"
+						,["Left"] = "Left"
+						,["Right"] = "Right"
+						,["Top"] = "Top"
+						,["Top left"] = "Top left"
+						,["Top right"] = "Top right"
+
+						}
+				, order = {"Bottom"
+						,"Bottom left"
+						,"Bottom right"
+						,"Center"
+						,"Left"
+						,"Right"
+						,"Top"
+						,"Top left"
+						,"Top right"
+
+						}
+}
+
 local BGTable = {options = {["none"] = "None"
 						,["Interface\\COMMON\\ShadowOverlay-Top"] = "Fade Top"
 						,["Interface\\COMMON\\ShadowOverlay-Right"] = "Fade Right"
@@ -242,7 +276,7 @@ local function CreateOptionsContainer(name, parent, height, title)
 	L_BGS_ContainerBG.center:SetPoint("bottomright", L_BGS_ContainerBG.bottomright, "topleft")
 	
 	L_BGS_ContainerBG.title = L_BGS_ContainerBG:CreateFontString(nil, nil, FontCheckBox)
-	L_BGS_ContainerBG.title:SetPoint("top",L_BGS_ContainerBG,"top", 0, -10)
+	L_BGS_ContainerBG.title:SetPoint("top",L_BGS_ContainerBG,"top", -17, -10)
 	L_BGS_ContainerBG.title:SetJustifyH("center")
 	L_BGS_ContainerBG.title:SetText(title)
 	
@@ -1219,7 +1253,7 @@ local function _CreateOptionsFrames()
 	L_BGS_ListsGroup:SetLayout("Fill")
 	Options_MainScroller:AddChild(L_BGS_ListsGroup)
 
-	local OptionFramesBG = CreateOptionsContainer("OptionFrames", L_BGS_ListsGroup, 340, "Tacker Customisation")
+	local OptionFramesBG = CreateOptionsContainer("OptionFrames", L_BGS_ListsGroup, 340, "Tracker Customisation")
 	
 	OptionFramesBG.divide = OptionFramesBG:CreateTexture("BGS_OptionFrames_D", "BORDER")
 	OptionFramesBG.divide:SetTexture("Interface\\FriendsFrame\\UI-ChannelFrame-VerticalBar", true)
@@ -1574,6 +1608,7 @@ local L_BGS_MiscGroup = AceGUI:Create("SimpleGroup")
 	BGS_MiscContainerInner.frame:SetPoint("topleft", MiscOptionBG.topleft, "topleft", 20, -27)
 	BGS_MiscContainerInner.frame:SetPoint("bottomright", MiscOptionBG.bottomright, "bottomright", -28, 25)
 
+
 -- Background Dropdown
 ------------------------------------------------------------------------------------------------------------------------
 	local ddwn_Background_Container = AceGUI:Create("SimpleGroup")
@@ -1606,7 +1641,15 @@ local L_BGS_MiscGroup = AceGUI:Create("SimpleGroup")
 	end)
 	BGS_MiscContainerInner:AddChild(L_BGS_SLColumns)
 	
-
+	
+	local cont_CHrow = AceGUI:Create("SimpleGroup")
+	--ddwn_Background_Container:SetRelativeWidth(1)
+	cont_CHrow:SetLayout("Flow")
+	cont_CHrow:SetFullWidth(true)
+	BGS_MiscContainerInner:AddChild(cont_CHrow)
+	
+-- Show Borders Checkbox
+------------------------------------------------------------------------------------------------------------------------
 	L_BGS_CBBorders = AceGUI:Create("CheckBox")
 	--L_BGS_CBHideTitle:SetFullWidth(true)
 	L_BGS_CBBorders:SetRelativeWidth(0.3)
@@ -1616,15 +1659,16 @@ local L_BGS_MiscGroup = AceGUI:Create("SimpleGroup")
 		ShowTrackerBorders(value)
 	end)
 	BGOptions.CBBorders = L_BGS_CBBorders
-	BGS_MiscContainerInner:AddChild(L_BGS_CBBorders)
+	cont_CHrow:AddChild(L_BGS_CBBorders)
+
 	
 -- Hide Icons Checkbox
 ------------------------------------------------------------------------------------------------------------------------
 	L_BGS_CBHideIcons = AceGUI:Create("CheckBox")
 	--L_BGS_CBHideIcons:SetFullWidth(true)
 	--L_BGS_CBHideIcons:SetRelativeWidth(1)
-	BGS_MiscContainerInner:AddChild(L_BGS_CBHideIcons)
-	L_BGS_CBHideIcons:SetRelativeWidth(0.2)
+	cont_CHrow:AddChild(L_BGS_CBHideIcons)
+	L_BGS_CBHideIcons:SetRelativeWidth(0.25)
 	L_BGS_CBHideIcons:SetLabel("Show Icons")
 	L_BGS_CBHideIcons:SetCallback("OnValueChanged", function(value)
 		if L_BGS_CBHideIcons:GetValue() then
@@ -1651,8 +1695,8 @@ local L_BGS_MiscGroup = AceGUI:Create("SimpleGroup")
 	L_BGS_CBHideTitle = AceGUI:Create("CheckBox")
 	--L_BGS_CBHideTitle:SetFullWidth(true)
 	--L_BGS_CBHideTitle:SetRelativeWidth(1)
-	BGS_MiscContainerInner:AddChild(L_BGS_CBHideTitle)
-	L_BGS_CBHideTitle:SetRelativeWidth(0.3)
+	cont_CHrow:AddChild(L_BGS_CBHideTitle)
+	L_BGS_CBHideTitle:SetRelativeWidth(0.4)
 	L_BGS_CBHideTitle:SetLabel("Show title and buttons")
 	L_BGS_CBHideTitle:SetCallback("OnValueChanged", function(_,_,value)
 		if  (value) then
@@ -1663,6 +1707,48 @@ local L_BGS_MiscGroup = AceGUI:Create("SimpleGroup")
 		BGS_TrackerClasses:TrackFramePos()
 		--ResizeBG()
 	end)
+	
+	
+-- Anchor checkbox
+------------------------------------------------------------------------------------------------------------------------
+	--[[
+	
+	L_BGS_CBAnchor = AceGUI:Create("CheckBox")
+	--L_BGS_CBHideTitle:SetFullWidth(true)
+	--L_BGS_CBHideTitle:SetRelativeWidth(1)
+	BGS_MiscContainerInner:AddChild(L_BGS_CBAnchor)
+	L_BGS_CBAnchor:SetRelativeWidth(0.3)
+	L_BGS_CBAnchor:SetLabel("Anchor to frame")
+	L_BGS_CBAnchor:SetCallback("OnValueChanged", function(_,_,value)
+		--if  (value) then
+		--	BGS_FrameTitle:Show()
+		--else
+		--	BGS_FrameTitle:Hide()
+		--end
+		--BGS_TrackerClasses:TrackFramePos()
+		--ResizeBG()
+	end)
+		
+
+
+	
+
+-- Anchor target textbox
+------------------------------------------------------------------------------------------------------------------------
+	L_BGS_TXTAnchorto = AceGUI:Create("EditBox")
+	BGS_MiscContainerInner:AddChild(L_BGS_TXTAnchorto)
+	L_BGS_TXTAnchorto:SetLabel("Other")
+	L_BGS_TXTAnchorto:SetText("")
+	--txt_Input:SetFullWidth(true)
+	L_BGS_TXTAnchorto:SetRelativeWidth(0.3)
+	L_BGS_TXTAnchorto:SetCallback("OnTextChanged", function(__,__, value)
+		--_baseString = value
+		--print(value)
+		--updateKeyString()
+	end)
+	
+	
+	]]--
 	
 -- Frame Info Box
 ------------------------------------------------------------------------------------------------------------------------

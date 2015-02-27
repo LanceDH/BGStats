@@ -1,8 +1,8 @@
-﻿## Interface: 60000
+﻿## Interface: 60100
 ## Title: BGStats
 ## Notes: Track PvP related stats.
 ## Author: LanceDH
-## Version: 6.0.02
+## Version: 6.1.01
 ## OptionalDeps: Ace3
 ## SavedVariablesPerCharacter: BGstats_BaseDataList, BGstats_ExtraFrameDataList
 BGStats.xml
