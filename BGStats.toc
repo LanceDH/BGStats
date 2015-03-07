@@ -2,7 +2,7 @@
 ## Title: BGStats
 ## Notes: Track PvP related stats.
 ## Author: LanceDH
-## Version: 6.1.01
+## Version: 6.1.02
 ## OptionalDeps: Ace3
 ## SavedVariablesPerCharacter: BGstats_BaseDataList, BGstats_ExtraFrameDataList
 BGStats.xml
@@ -10,14 +10,5 @@ BGStats.lua
 
 
 Trackers\HonorFrame.lua
-Trackers\ConquestFrame.lua
-Trackers\KillsFrame.lua
-Trackers\AccKillsFrame.lua
-Trackers\AchFrame.lua
-Trackers\ScoreFrame.lua
-Trackers\TBFrame.lua
-Trackers\XPFrame.lua
-Trackers\SessionFrame.lua
 Trackers\Custom.lua
-Trackers\GarrisonFrame.lua
-Trackers\FragmentFrame.lua
+Trackers\AccKillsFrame.lua

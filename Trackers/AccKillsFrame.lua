@@ -6,17 +6,17 @@
 -- General Tracker variables
 local AceGUI = LibStub("AceGUI-3.0")
 local addonName, BGS_TrackerClasses = ...
-local TrackerClass = {}
-TrackerClass.name = "AccKillsFrame"
-TrackerClass.detail = "Account Kills"
-TrackerClass.icon = "Interface\\ICONS\\warrior_skullbanner"
-TrackerClass.info = "Honorable kills across your account (250k limit)"
-TrackerClass.options = {}
-TrackerClass.colSpan = 1
-TrackerClass.justify = "left"
-TrackerClass.frame = nil
-local _defaultOPtions = BGS_TrackerClasses:CreateDefaultTrackerOptions()
-table.insert(BGS_TrackerClasses, {class = TrackerClass})
+local TestClass = {}
+TestClass.__index = TestClass
+setmetatable(TestClass, {
+  __call = function (cls, ...)
+    return cls.new(...)
+  end,
+})
+
+local _type = "Account Kills"
+
+table.insert(BGS_TrackerClasses, {fType = _type, class = TestClass })
 -- Tracker Specific variables
 
 
@@ -24,13 +24,109 @@ table.insert(BGS_TrackerClasses, {class = TrackerClass})
 -- General Tracker Methods
 --------------------------------------------------------------------------------
 
-function TrackerClass:SetColspan(cols, maxCols)
-	TrackerClass.colSpan = cols
-	--_OptionTable.txt_colSpan:SetText(TrackerClass.colSpan)
-	_defaultOPtions.sl_ColSpan:SetSliderValues(1, maxCols, 1)
-	_defaultOPtions.sl_ColSpan:SetValue(TrackerClass.colSpan)
+local function eventHandle(class, event)
+	
+	if event == "PLAYER_PVP_KILLS_CHANGED"then
+		class:UpdateAccKillsInfo()
+	return
+	end
+
 end
 
+local function CreateUpdateFrame(class)
+	local _eventsFrame = CreateFrame("FRAME", "BGS_"..class.detail.."Events");
+	_eventsFrame:RegisterEvent("PLAYER_PVP_KILLS_CHANGED");
+	_eventsFrame:SetScript("OnEvent", function(self, event, ...) eventHandle(class, event) end)
+end
+
+local function CreateSpecificOptions(class)
+
+	local scrollcontainer = AceGUI:Create("SimpleGroup")
+	scrollcontainer:SetFullWidth(true)
+	scrollcontainer:SetWidth(185)
+	scrollcontainer:SetFullHeight(true)
+	scrollcontainer:SetHeight(170)
+	scrollcontainer:SetLayout("Fill")
+
+	
+
+	local scroll = AceGUI:Create("ScrollFrame")
+	scroll:SetLayout("Flow")
+	scrollcontainer:AddChild(scroll)
+	
+	
+	scroll:AddChild(class._defaultOPtions.txt_Name)
+
+	-- Tracker Info
+	--class._defaultOPtions.frameDetail.text:SetText(class.info)
+	scroll:AddChild(class._defaultOPtions.frameDetail)
+	
+	-- Tracker Slider
+	
+	scroll:AddChild(class._defaultOPtions.sl_ColSpan)
+	
+	-- Tracker Text Alignment
+	
+	scroll:AddChild(class._defaultOPtions.ddwn_Align)
+	
+	return scrollcontainer
+end
+
+function TestClass.new(name, id, save)
+  local self = setmetatable({}, TestClass)
+	self.name = name
+	self.detail = "frame_"..id
+	self.icon = "Interface\\ICONS\\warrior_skullbanner"
+	self.info = "Honorable kills across your account (250k limit)"
+	self.options = {}
+	self.frameNr = id
+	self.visipos = -1
+	self.colSpan = 1
+	self.justify = "left"
+	self.type = _type
+	
+	if save ~= nil then
+		self:LoadSave(save)
+	end
+	
+	self.frame = BGS_TrackerClasses:CreateTrackerFrame(self)
+	self.optionFrame = BGS_TrackerClasses:createSmallFrame(self)
+	
+	self._defaultOPtions = BGS_TrackerClasses:CreateDefaultTrackerOptions(self)
+	self:UpdateAccKillsInfo()
+	
+	table.insert(self.options, CreateSpecificOptions(self))
+	
+	CreateUpdateFrame(self)
+	
+  return self
+end
+
+function TestClass:GetSave()
+	local save = {}
+	save.name = self.name
+	save.visipos = self.visipos
+	save.colSpan = self.colSpan
+	save.justify = self.justify
+	save.type = self.type
+
+	return save
+end
+
+function TestClass:LoadSave(save)
+	self.name = save.name
+	self.visipos = save.visipos
+	self.colSpan = save.colSpan
+	self.justify = save.justify
+end
+
+function TestClass:SetColspan(cols, maxCols)
+	self.colSpan = cols
+	self._defaultOPtions.sl_ColSpan:SetSliderValues(1, maxCols, 1)
+	self._defaultOPtions.sl_ColSpan:SetValue(self.colSpan)
+end
+
+--[[
 local function CreateSpecificOptions()
 
 	local scrollcontainer = AceGUI:Create("SimpleGroup")
@@ -66,70 +162,18 @@ local function CreateSpecificOptions()
 	scroll:AddChild(_defaultOPtions.ddwn_Align)
 	
 end
+]]--
 
-function TrackerClass:Create()
-	TrackerClass.frame = BGS_TrackerClasses:CreateTrackerFrame(TrackerClass)
-	CreateSpecificOptions()
-end
 
 --------------------------------------------------------------------------------
 -- Tracker Specific Methods
 --------------------------------------------------------------------------------
 
-local function UpdateAccKillsInfo()
-	local KillsFrame = BGS_TrackerClasses:GetFrameByName(TrackerClass.name)
-	KillsFrame.text:SetText(BGS_TrackerClasses:GetAccHKills())
+function TestClass:UpdateAccKillsInfo()
+	self.frame.text:SetText(BGS_TrackerClasses:GetAccHKills())
 end	
 	
 --------------------------------------------------------------------------------
 -- Event Handling
 --------------------------------------------------------------------------------
 
-local function eventHandle(event)
-	if not (BGS_TrackerClasses:GetFrameByName(TrackerClass.name)) then
-		return
-	end
-	
-	if event == "PLAYER_PVP_KILLS_CHANGED"then
-		UpdateAccKillsInfo()
-	return
-	end
-	
-	if event == "PLAYER_LOGIN" then
-		UpdateAccKillsInfo()
-		local extra = BGS_TrackerClasses:GetInfoList(TrackerClass.name)
-		if extra then
-			if (extra.colSpan) then
-				TrackerClass.colSpan = extra.colSpan
-			end
-			TrackerClass.frame.colSpan = TrackerClass.colSpan
-			_defaultOPtions.sl_ColSpan:SetValue(TrackerClass.colSpan)
-			BGS_TrackerClasses:TrackFramePos()
-			if(extra.justify) then
-				TrackerClass.justify = extra.justify
-			end
-			_defaultOPtions.ddwn_Align:SetValue(TrackerClass.justify)
-			TrackerClass.frame.text:SetJustifyH(TrackerClass.justify)
-		end
-	end
-	
-	if event == "ADDON_LOADED" then
-		if addon ~= addonName then return end
-		self:UnregisterEvent("ADDON_LOADED")
-		
-		
-		
-		return
-	end
-	
-	if event == "PLAYER_LOGOUT" then
-		table.insert(BGstats_ExtraFrameDataList, {frame = TrackerClass.name, colSpan = TrackerClass.colSpan, justify = TrackerClass.justify})
-	end
-end
-
-local _eventsFrame = CreateFrame("FRAME", "BGS_"..TrackerClass.name.."Events"); 
-_eventsFrame:RegisterEvent("PLAYER_LOGOUT");
-_eventsFrame:RegisterEvent("PLAYER_LOGIN");
-_eventsFrame:RegisterEvent("PLAYER_PVP_KILLS_CHANGED");
-_eventsFrame:RegisterEvent("ADDON_LOADED");
-_eventsFrame:SetScript("OnEvent", function(self, event, ...) eventHandle(event) end)

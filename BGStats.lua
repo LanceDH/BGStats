@@ -25,6 +25,7 @@ local OPTIONS_TINYBTN_SIZE = 20
 local DEFAULT_TRACKER_WIDTH = 105
 local DEFAULT_TRACKER_HEIGHT = 20
 local _TrackColumns = 1
+local _CreatedFrameCounter = 0
 
 local DEFAULT_BG = "Interface\\DialogFrame\\UI-DialogBox-Background"
 local DEFAULT_EDGEFILE = "Interface\\DialogFrame\\UI-DialogBox-Border"
@@ -35,6 +36,7 @@ local mainInset = 3
 
 local _BGPlayerList = {}
 
+local TestClasses = {}
 
 local AnchorTable = {options = {["other"] = "Other"
 						,["UIParent"] = "Screen"
@@ -173,42 +175,8 @@ local L_BGS_SLColumns = nil
 ----------------------------------------
 -- Addon Wide functions
 ----------------------------------------
-function BGS_TrackerClasses:CreateDefaultTrackerOptions()
-	local DEFAULT_TRACKER_OPTIONS = {}
-	local frameDetail = AceGUI:Create("SimpleGroup")
-	frameDetail:SetFullWidth(true)
-	frameDetail:SetHeight(25)
-	frameDetail:SetLayout("Fill")
-	frameDetail.bg = frameDetail.frame:CreateTexture("frameDetail_Tex")
-	frameDetail.bg:SetTexture("Interface\\LFGFRAME\\UI-LFG-SEPARATOR")
-	frameDetail.bg:SetHeight(frameDetail.frame:GetHeight()/2)
-	frameDetail.bg:SetTexCoord(0, 168/256, 0, 34/128)
-	frameDetail.bg:SetPoint("bottom", 0, -2)
-	frameDetail.text = frameDetail.frame:CreateFontString(nil, nil, "GameFontHighlightSmall")
-	frameDetail.text:SetHeight(frameDetail.frame:GetHeight())
-	frameDetail.text:SetText("Default Text")
-	frameDetail.text:SetPoint("topleft", 0, 0)
-	frameDetail.text:SetPoint("topright", 0, 0)
-	DEFAULT_TRACKER_OPTIONS.frameDetail = frameDetail
-	
-	local sl_ColSpan = AceGUI:Create("Slider")
-	--sl_ColSpan:SetFullWidth(true)
-	sl_ColSpan:SetRelativeWidth(0.5)
-	sl_ColSpan:SetLabel("Column Span")
-	sl_ColSpan:SetSliderValues(1, 1 , 1)
-	sl_ColSpan:SetValue(1)
-	DEFAULT_TRACKER_OPTIONS.sl_ColSpan = sl_ColSpan
 
-	ddwn_Align = AceGUI:Create("Dropdown")
-	ddwn_Align:SetRelativeWidth(0.4)
-	ddwn_Align:SetList(DEFAULT_ALIGNMENTS.options, DEFAULT_ALIGNMENTS.order)
-	ddwn_Align:SetLabel("Text Alignment")
-	
-	DEFAULT_TRACKER_OPTIONS.ddwn_Align = ddwn_Align
-	--ddwn_Background_Container:AddChild(ddwn_Background)
-	
-	return DEFAULT_TRACKER_OPTIONS
-end
+
 
 local function CreateOptionsContainer(name, parent, height, title)
 	
@@ -471,42 +439,7 @@ function BGS_TrackerClasses:GetFrameByName(name)
 	return nil
 end
 
-function BGS_TrackerClasses:CreateTrackerFrame(class)
 
-	local frame = CreateFrame("frame", "BGS_"..class.name, BGStatFrame)
-	-- text
-	frame.text = frame:CreateFontString(nil, nil, "GameFontNormal")	
-	frame.text:SetPoint("left", DEFAULT_TRACKOFFSET_WITH, 0)
-	frame.text:SetPoint("right", -2, 0)
-	frame.text:SetJustifyH(class.justify)
-	frame.text:SetWordWrap(false)
-	-- icon
-	frame.icon = frame:CreateTexture(class.name.."_Icon")
-	frame.icon:SetTexture(class.icon)
-	frame.icon:SetPoint("left", frame, "left", 3, -1)
-	frame.icon:SetSize(18,18) 
-	frame.icon:Show()
-	frame.detail = class.detail
-	frame.info = class.info
-	frame.options = class.options
-	if class.colSpan == nil then
-		class.colSpan = 1
-	end
-	frame.colSpan = class.colSpan
-	frame.visiPos = 0
-	frame.class = class
-	frame:SetPoint("topleft", BGStatFrame, "topleft", 0, -25)
-	frame:SetWidth(DEFAULT_TRACKER_WIDTH * class.colSpan)
-	--frame.text:SetWidth(DEFAULT_TRACKER_WIDTH * v.colSpan -30)
-	frame:SetHeight(DEFAULT_TRACKER_HEIGHT)
-	frame:Hide()
-	DefaultFrames[#DefaultFrames+1] = frame
-	--table.insert(DefaultFrames, frame)
-	table.sort(DefaultFrames, function(a, b) if a.detail < b.detail then return true end end)
-	
-	return frame
-	
-end
 
 local function TempOETSWinLossFix(list)
 
@@ -843,7 +776,7 @@ local function ResizeBG(totalHeight)
 	if totalHeight == nil then
 		local count = 0
 		for  id, frame in ipairs(DefaultFrames) do
-			if frame.visiPos > 0 then
+			if frame.visipos > 0 then
 			--	count = count + 1
 			BGSize = BGSize + frame:GetHeight()
 			end
@@ -865,18 +798,19 @@ function BGS_TrackerClasses:TrackFramePos()
 	
 	-- create array with only shown frames ordered by visipos
 	local shownArr = {}
-	for k, frame in ipairs(DefaultFrames) do
-		if frame.visiPos > 0 then
-			shownArr[frame.visiPos] = frame
+	for k, class in ipairs(TestClasses) do
+		if class.visipos > 0 then
+			shownArr[class.visipos] = class.frame
 		end
-		if frame.class ~= nil then
-			frame.class:SetColspan(frame.colSpan, _TrackColumns);
+		if class ~= nil then
+			class:SetColspan(class.frame.colSpan, _TrackColumns);
 		end
 	end
 	
 	-- place frames at their position
 	local count = 0;
 	for  k, frame in ipairs(shownArr) do
+		--print("name: "..shownArr.name)
 		--failsafe
 		if frame.colSpan == nil then
 			frame.colSpan = 1
@@ -911,20 +845,20 @@ end
 
 local function DoShowFrames()
 -- Show every frame and their icons in chosen.
-	for k, v in ipairs(DefaultFrames) do
-		v:Show()
+	for k, v in ipairs(TestClasses) do
+		v.frame:Show()
 		if L_BGS_CBHideIcons:GetValue() then
-			v.icon:Show()
+			v.frame.icon:Show()
 		end
 	end
 end
 
 local function DoHiddenFrames()
 -- Hide All frames that shouldn't be shown
-	for k, v in ipairs(DefaultFrames) do
-		if v.visiPos == 0 then
-			v:Hide()
-			v.icon:Hide()
+	for k, v in ipairs(TestClasses) do
+		if v.visipos == 0 then
+			v.frame:Hide()
+			v.frame.icon:Hide()
 		end
 	end
 end
@@ -937,20 +871,22 @@ local function Options_PlaceShownFrames()
 	local count = 1
 	local VisibleArr = {}
 	local HiddenArr = {}
-	for k, v in ipairs(DefaultFrames) do	
-		local frame = GetOptionsFrameByInfo(v.detail)
+	
+	for k, v in ipairs(TestClasses) do	
+		local frame = v.optionFrame
 		if frame == -1 then
 			return
 		end
-		if v.visiPos > 0 then
+		if v.visipos > 0 then
 			--frame.visible = true
-			VisibleArr[v.visiPos] = frame
+			VisibleArr[v.visipos] = frame
 		else
 			HiddenArr[#HiddenArr+1] = frame
 			--table.insert(HiddenArr, frame)
 		end
 	end
 
+	
 	if table.getn(VisibleArr) == 0 then
 		BGS_OptionFramesContainer_Green:Hide()
 	else
@@ -1018,30 +954,57 @@ local function Options_PlaceShownFrames()
 	
 end
 
-local function ShowFrame(key)
-	local frame = DefaultFrames[key]
+local function GetNumShownFrames()
+	local count = 0
+	for k, v in ipairs(TestClasses) do	
+		if v.visipos > 0 then
+			count = count + 1
+		end
+	end
+	return count
+end
+
+local function ShowFrame(frameNr)
+
+	local key = 1
+	for k, v in ipairs(TestClasses) do
+		if v.frameNr == frameNr then
+			key = k
+		end
+	end
+
+	local frame = TestClasses[key]
 	if (frame) then
 		-- Get current highest pos and add the current frame after than
 		local highestPos = 0
-		for k, v in ipairs(DefaultFrames) do
-			if v.visiPos > highestPos then
-				highestPos = v.visiPos
+		for k, v in ipairs(TestClasses) do
+			if v.visipos > highestPos then
+				highestPos = v.visipos
 			end
 		end
-		frame.visiPos = highestPos + 1
+		frame.visipos = highestPos + 1
 	end
 end
 
-local function HideFrame(key)
-	local frame = DefaultFrames[key]
+local function HideFrame(frameNr)
+	local key = 1
+	for k, v in ipairs(TestClasses) do
+		if v.frameNr == frameNr then
+			key = k
+		end
+	end
+
+	local frame = TestClasses[key]
+	--local class = Testclasses[key]
 	if (frame) then
 		-- change pos of hidden to 0
-		local removedPos = frame.visiPos
-		frame.visiPos = 0
+		local removedPos = frame.visipos
+		--class.visipos = 0
+		frame.visipos = 0
 		-- move frames after hidden one 1 position down.
-		for k, v in ipairs(DefaultFrames) do
-			if v.visiPos > removedPos then
-				v.visiPos = v.visiPos - 1
+		for k, v in ipairs(TestClasses) do
+			if v.visipos > removedPos then
+				v.visipos = v.visipos - 1
 			end
 		end
 	end
@@ -1074,33 +1037,67 @@ local function GetPositionInShown(key)
 	return 0
 end
 
-local function MoveUpInShown(key)
-	-- Find other frame to switch places
-	local temp = DefaultFrames[key].visiPos
+local function MoveUpInShown(frameNr)
+
+	local key = 1
+	for k, v in ipairs(TestClasses) do
+		if v.frameNr == frameNr then
+			key = k
+		end
+	end
+
+
+	local temp = TestClasses[key].visipos
 	local otherFrame
-	for k, v in ipairs(DefaultFrames) do
-		if v.visiPos == temp -1 then
+	for k, v in ipairs(TestClasses) do
+		if v.visipos == temp -1 then
 			otherFrame = v
 		end
 	end
-	local pos = otherFrame.visiPos 
-	otherFrame.visiPos = DefaultFrames[key].visiPos
-	DefaultFrames[key].visiPos = pos
-
+	local pos = otherFrame.visipos 
+	otherFrame.visipos = TestClasses[key].visipos
+	TestClasses[key].visipos = pos
 end
 
-local function MoveDownInShown(key)
+local function MoveDownInShown(frameNr)
+
+	local key = 1
+	for k, v in ipairs(TestClasses) do
+		if v.frameNr == frameNr then
+			key = k
+		end
+	end
+
 	-- Find other frame to switch places
-	local temp = DefaultFrames[key].visiPos
+	local temp = TestClasses[key].visipos
 	local otherFrame
-	for k, v in ipairs(DefaultFrames) do
-		if v.visiPos == temp +1 then
+	for k, v in ipairs(TestClasses) do
+		if v.visipos == temp +1 then
 			otherFrame = v
 		end
 	end
-	local pos = otherFrame.visiPos 
-	otherFrame.visiPos = DefaultFrames[key].visiPos
-	DefaultFrames[key].visiPos = pos
+	local pos = otherFrame.visipos 
+	otherFrame.visipos = TestClasses[key].visipos
+	TestClasses[key].visipos = pos
+end
+
+local function SetMaxColums(maxNr)
+	if maxNr <= 1 then
+		maxNr = 1
+	end
+
+
+	local current = L_BGS_SLColumns:GetValue()
+	L_BGS_SLColumns:SetSliderValues(1, maxNr, 1)
+	L_BGS_SLColumns:SetValue(current)
+	
+	
+	
+	for k, class in ipairs(TestClasses) do
+		if class ~= nil then
+			class:SetColspan(class.colSpan, current);
+		end
+	end
 end
 
 local function FixOptionFrames()
@@ -1108,9 +1105,339 @@ local function FixOptionFrames()
 	DoHiddenFrames()
 	Options_PlaceShownFrames()
 	BGS_TrackerClasses:TrackFramePos()
+	SetMaxColums(#TestClasses)
 	--ResizeBG()
 end
 
+function BGS_TrackerClasses:createSmallFrame(v)
+	local k = v.frameNr
+	local trackName = "BGS_Optframe_"..v.detail
+		-- Create a small frame
+		local BGS_OptframeDefault = CreateFrame("Button", trackName, BGS_OptionFramesContainer)
+		BGS_OptframeDefault.tracker = v
+		BGS_OptframeDefault:SetPoint("left", BGS_OptionFramesContainer, 0, 0)
+		BGS_OptframeDefault:SetPoint("right", BGS_OptionFramesContainer, 0, 0)
+		BGS_OptframeDefault:SetHeight(20)
+		-- Default Background
+		BGS_OptframeDefault.bg = BGS_OptframeDefault:CreateTexture(trackName.."_BG")
+		BGS_OptframeDefault.bg:SetTexture("Interface\\CHATFRAME\\CHATFRAMEBACKGROUND")
+		BGS_OptframeDefault.bg:SetDrawLayer("background", 0)
+		BGS_OptframeDefault.bg:SetParent(BGS_OptframeDefault)
+		BGS_OptframeDefault.bg:SetPoint("topleft",BGS_OptframeDefault,  0, 0)
+		BGS_OptframeDefault.bg:SetPoint("bottomright",BGS_OptframeDefault, 0, 0)
+		BGS_OptframeDefault.bg:SetVertexColor(.2, .2, .2)
+		BGS_OptframeDefault.bg:SetAlpha(0.6)
+		--BGS_OptframeDefault.bg:SetPoint("left", BGS_OptframeDefault, "left", 0, 0)
+		BGS_OptframeDefault.bg:SetSize(BGS_OptframeDefault:GetWidth(),BGS_OptframeDefault:GetHeight()) 
+		BGS_OptframeDefault.bg:Show()
+		-- Selected frame Background
+		BGS_OptframeDefault.hl = BGS_OptframeDefault:CreateTexture(trackName.."_Highlight")
+		BGS_OptframeDefault.hl:SetTexture(nil)
+		BGS_OptframeDefault.hl:SetDrawLayer("background", 1)
+		BGS_OptframeDefault.hl:SetAlpha(1)
+		BGS_OptframeDefault.hl:SetParent(BGS_OptframeDefault)
+		BGS_OptframeDefault.hl:SetPoint("topleft", 0, 0)
+		BGS_OptframeDefault.hl:SetPoint("bottomright", 0, 0)
+		BGS_OptframeDefault.hl:SetSize(BGS_OptframeDefault:GetWidth(),BGS_OptframeDefault:GetHeight()) 
+		BGS_OptframeDefault.hl:Show()
+		--BGS_OptframeDefault:SetWidth(BGS_OptframeDefault:GetParent():GetWidth()-10)
+		BGS_OptframeDefault:SetHighlightTexture("Interface\\FriendsFrame\\UI-FriendsFrame-HighlightBar-Blue")
+		-- Face Text
+		BGS_OptframeDefault.text = BGS_OptframeDefault:CreateFontString(nil, nil, FontCheckBox)
+		BGS_OptframeDefault.text:SetPoint("left", 5, 0)
+		BGS_OptframeDefault.text:SetWidth(120)
+		BGS_OptframeDefault.text:SetJustifyH("left") 
+		BGS_OptframeDefault.text:SetText(v.name)
+		BGS_OptframeDefault:SetScript("OnClick",  function(self)
+			PlaySound("igMainMenuOptionCheckBoxOn");
+			local info = v.info
+			FixOptionFrames()
+			-- Reset all frames
+			for k, v in ipairs(OptionsFrame) do
+				v.bg:SetVertexColor(.2, .2, .2)
+				v.bg:SetTexCoord(0,1,0,1)
+				v.hl:SetTexture(nil)
+			end
+			
+			-- Give highlight to clicked frame
+			BGS_OptframeDefault.hl:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrame-HighlightBar")
+			-- Change label of info box
+			BGS_FramesortBG_Info.text:SetText(BGS_OptframeDefault.text:GetText())
+			
+			-- Hide all children in info box
+			if {BGS_FramesortBG_Info:GetChildren()} ~= nill	then
+				for k, child in ipairs({BGS_FramesortBG_Info:GetChildren()}) do
+					child:Hide()
+				end
+			end
+			
+			-- Place the info/options of the frame in the info box
+			if v.options ~= nill then
+				for k, f in ipairs(v.options) do
+					f.frame:SetParent(BGS_FramesortBG_Info)
+					f.frame:SetPoint("topleft", BGS_FramesortBG_Info, "topleft", 0, 0)
+					f.frame:SetPoint("bottomright", BGS_FramesortBG_Info, "bottomright", 0, 0)
+					f.frame:Show()
+				end
+			else
+				print("Options are nill")
+			end
+			
+		end)-- end of frame onclick function
+
+		OptionsFrame[#OptionsFrame+1] = BGS_OptframeDefault
+		--table.insert(OptionsFrame, BGS_OptframeDefault)
+
+		-- create up button
+		local moveUp = CreateFrame("Button", trackName.."_moveUp", BGS_OptframeDefault)
+		moveUp:SetWidth(OPTIONS_TINYBTN_SIZE)
+		moveUp:SetHeight(OPTIONS_TINYBTN_SIZE)
+		moveUp:SetNormalTexture("Interface\\CHATFRAME\\UI-ChatIcon-ScrollUp-Up")
+		moveUp:SetHighlightTexture("Interface\\CHATFRAME\\UI-ChatIcon-ScrollUp-Down")
+		moveUp:SetPushedTexture("Interface\\CHATFRAME\\UI-ChatIcon-ScrollUp-Down")
+		moveUp:SetPoint("left", trackName, "left", 122 +(15+1)*1, 0)
+		moveUp.classRef = v
+		moveUp:SetScript("OnClick",  function(self)
+			PlaySound("igMainMenuOptionCheckBoxOn");
+			MoveUpInShown(moveUp.classRef.frameNr)
+			FixOptionFrames()
+		end)
+		moveUp:Hide()
+
+		-- create down button
+		local moveDown = CreateFrame("Button", trackName.."_moveDown", BGS_OptframeDefault)
+		moveDown:SetWidth(OPTIONS_TINYBTN_SIZE)
+		moveDown:SetHeight(OPTIONS_TINYBTN_SIZE)
+		moveDown:SetNormalTexture("Interface\\CHATFRAME\\UI-ChatIcon-ScrollDown-Up")
+		moveDown:SetHighlightTexture("Interface\\CHATFRAME\\UI-ChatIcon-ScrollDown-Down")
+		moveDown:SetPushedTexture("Interface\\CHATFRAME\\UI-ChatIcon-ScrollDown-Down")
+		moveDown:SetPoint("left", trackName, "left", 122 +(15+1)*2, 0)
+		moveDown.classRef = v
+		moveDown:SetScript("OnClick",  function(self)
+			PlaySound("igMainMenuOptionCheckBoxOn");
+			MoveDownInShown(moveDown.classRef.frameNr)
+			FixOptionFrames()
+		end)
+		moveDown:Hide()
+
+		-- create move button 
+		local move = CreateFrame("Button", trackName.."_move", BGS_OptframeDefault)
+		move:SetWidth(OPTIONS_TINYBTN_SIZE)
+		move:SetHeight(OPTIONS_TINYBTN_SIZE)
+		--move:SetNormalTexture("Interface\\BUTTONS\\UI-SpellbookIcon-NextPage-Up")
+		move:SetHighlightTexture("Interface\\LFGFRAME\\BattlenetWorking2")
+		--move:SetPushedTexture("Interface\\BUTTONS\\UI-SpellbookIcon-NextPage-Down")
+		move:SetPoint("left", trackName, "left", 122, 0)
+		move:Show()
+		move.classRef = v
+		move:SetScript("OnClick",  function(self)
+			BGS_firstrunInfo:Hide()
+			PlaySound("igMainMenuOptionCheckBoxOn");
+			local parent = self:GetParent()
+			local btnUp, btnDown = parent:GetChildren()
+			-- swap frame between boxes
+			if (v.visipos > 0) then
+				--print(parent:GetName() .. " hidden")
+				HideFrame(move.classRef.frameNr)
+				btnUp:Hide()
+				btnDown:Hide()
+			else
+				--print(parent:GetName() .. " shown")
+				btnUp:Show()
+				btnDown:Show()
+				ShowFrame(move.classRef.frameNr)
+			end
+			parent:SetPoint("left", 0, 0)
+			parent:SetPoint("right", 0, 0)
+			FixOptionFrames()
+		end)
+		
+		return BGS_OptframeDefault
+end
+
+function BGS_TrackerClasses:CreateTrackerFrame(class)
+
+	local frame = CreateFrame("frame", "BGS_"..class.detail, BGStatFrame)
+	-- text
+	frame.text = frame:CreateFontString(nil, nil, "GameFontNormal")	
+	frame.text:SetPoint("left", DEFAULT_TRACKOFFSET_WITH, 0)
+	frame.text:SetPoint("right", -2, 0)
+	frame.text:SetJustifyH(class.justify)
+	frame.text:SetWordWrap(false)
+	-- icon
+	frame.icon = frame:CreateTexture(class.name.."_Icon")
+	frame.icon:SetTexture(class.icon)
+	frame.icon:SetPoint("left", frame, "left", 3, -1)
+	frame.icon:SetSize(18,18) 
+	frame.icon:Show()
+	frame.detail = class.detail
+	frame.info = class.info
+	frame.options = class.options
+	if class.colSpan == nil then
+		class.colSpan = 1
+	end
+	frame.colSpan = class.colSpan
+	--class.visipos = #DefaultFrames + 1
+	--frame.visipos = class.visipos
+	frame.class = class
+	frame:SetPoint("topleft", BGStatFrame, "topleft", 0, -25)
+	frame:SetWidth(DEFAULT_TRACKER_WIDTH * class.colSpan)
+	--frame.text:SetWidth(DEFAULT_TRACKER_WIDTH * v.colSpan -30)
+	frame:SetHeight(DEFAULT_TRACKER_HEIGHT)
+	frame:Hide()
+	DefaultFrames[#DefaultFrames+1] = frame
+	--table.insert(DefaultFrames, frame)
+	table.sort(DefaultFrames, function(a, b) if a.detail < b.detail then return true end end)
+	
+
+	return frame
+	
+end
+
+
+local function RemoveFrame(pos)
+	TestClasses[pos].frame:Hide()
+	TestClasses[pos].optionFrame:Hide()
+	
+	if TestClasses[pos].visipos ~= 0 then -- don't change things if deleted frame is hidden
+		for i=1,#TestClasses do 
+			if TestClasses[i].visipos > TestClasses[pos].visipos then -- change frames that are higher than this one
+				TestClasses[i].visipos = TestClasses[i].visipos -1
+			end
+		end
+	end
+	
+	table.remove(TestClasses, pos)
+	
+	for i=pos,#TestClasses do 
+		TestClasses[i].frameNr = TestClasses[i].frameNr -1
+	end
+	
+	
+	
+	
+	if {BGS_FramesortBG_Info:GetChildren()} ~= nill	then
+		for k, child in ipairs({BGS_FramesortBG_Info:GetChildren()}) do
+			child:Hide()
+		end
+	end
+			
+			-- Place the info/options of the frame in the info box
+		BGS_OptionDefaultInfo.frame:SetParent(BGS_FramesortBG_Info)
+		BGS_OptionDefaultInfo.frame:SetPoint("topleft", BGS_FramesortBG_Info, "topleft", 0, 0)
+		BGS_OptionDefaultInfo.frame:SetPoint("bottomright", BGS_FramesortBG_Info, "bottomright", 0, 0)
+		BGS_OptionDefaultInfo.frame:Show()
+		BGS_FramesortBG_Info.text:SetText("Track Options")
+	
+	FixOptionFrames()
+end
+
+local function CreateTrackerOfType(frameType, save)
+
+	for k, v in ipairs(BGS_TrackerClasses) do
+		if(v.fType == frameType) then
+			_CreatedFrameCounter = _CreatedFrameCounter + 1
+			local count = _CreatedFrameCounter
+			tracker = v.class(v.fType..count, count, save)
+			if tracker.visipos == -1 then
+				tracker.visipos = GetNumShownFrames() + 1
+			end
+			table.insert(TestClasses, tracker)
+			
+			SetMaxColums(#TestClasses)
+			FixOptionFrames()
+			
+			return
+		end
+	end
+	
+end
+
+function BGS_TrackerClasses:CreateDefaultTrackerOptions(class)
+	local DEFAULT_TRACKER_OPTIONS = {}
+	
+	local txt_Name = AceGUI:Create("EditBox")
+	txt_Name:SetLabel("Tracker Name")
+	txt_Name:SetText(class.name)
+	txt_Name:SetRelativeWidth(0.5)
+	txt_Name:SetCallback("OnTextChanged", function(__,__, value)
+		class.name = value
+		class.optionFrame.text:SetText(value)
+	end)
+	DEFAULT_TRACKER_OPTIONS.txt_Name = txt_Name
+	
+	local frameDetail = AceGUI:Create("SimpleGroup")
+	frameDetail:SetRelativeWidth(0.5)
+	frameDetail:SetHeight(25)
+	frameDetail:SetLayout("Fill")
+	frameDetail.bg = frameDetail.frame:CreateTexture("frameDetail_Tex")
+	frameDetail.bg:SetTexture("Interface\\LFGFRAME\\UI-LFG-SEPARATOR")
+	frameDetail.bg:SetHeight(frameDetail.frame:GetHeight()/2)
+	frameDetail.bg:SetTexCoord(0, 168/256, 0, 34/128)
+	frameDetail.bg:SetPoint("bottom", 0, -2)
+	frameDetail.text = frameDetail.frame:CreateFontString(nil, nil, "GameFontHighlightSmall")
+	frameDetail.text:SetHeight(frameDetail.frame:GetHeight())
+	frameDetail.text:SetText("Tracker type:\n"..class.type)
+	frameDetail.text:SetPoint("topleft", 0, 0)
+	frameDetail.text:SetPoint("topright", 0, 0)
+	frameDetail.text:SetPoint("topright", 0, 0)
+	DEFAULT_TRACKER_OPTIONS.frameDetail = frameDetail
+	
+	local RemoveButton = CreateFrame("Button", "BGS_Options_"..class.detail.."remove", frameDetail.frame)
+	RemoveButton:SetWidth(32)
+	RemoveButton:SetHeight(32)
+	RemoveButton:SetHitRectInsets(4, 4, 4, 4)
+	RemoveButton:SetNormalTexture("Interface\\BUTTONS\\UI-Panel-MinimizeButton-Up")
+	RemoveButton:SetHighlightTexture("Interface\\BUTTONS\\UI-Panel-MinimizeButton-Highlight")
+	RemoveButton:SetPushedTexture("Interface\\BUTTONS\\UI-Panel-MinimizeButton-Down")
+	RemoveButton:SetPoint("bottomright", frameDetail.frame, "bottomright", -5, 5)
+	--FPS_CloseButton:Show()
+	RemoveButton:SetScript("OnClick",  function() 
+		
+		
+		local pos = -1;
+		
+		for k, v in ipairs(TestClasses) do
+			if v.detail == class.detail then
+				pos = k
+			end
+		end
+		
+		if pos ~= -1 then
+			RemoveFrame(pos)
+		end
+		
+		--table.remove()
+		
+	end)
+	
+	local sl_ColSpan = AceGUI:Create("Slider")
+	--sl_ColSpan:SetFullWidth(true)
+	sl_ColSpan:SetRelativeWidth(0.5)
+	sl_ColSpan:SetLabel("Column Span")
+	sl_ColSpan:SetSliderValues(1, 1 , 1)
+	sl_ColSpan:SetValue(1)
+	sl_ColSpan:SetCallback("OnValueChanged", function(__,__,value)
+		--local frame = BGS_TrackerClasses:GetFrameByName(class.name)
+		class.frame.colSpan = tonumber(value)
+		BGS_TrackerClasses:TrackFramePos()
+	end)
+	DEFAULT_TRACKER_OPTIONS.sl_ColSpan = sl_ColSpan
+
+	ddwn_Align = AceGUI:Create("Dropdown")
+	ddwn_Align:SetRelativeWidth(0.4)
+	ddwn_Align:SetList(DEFAULT_ALIGNMENTS.options, DEFAULT_ALIGNMENTS.order)
+	ddwn_Align:SetLabel("Text Alignment")
+	ddwn_Align:SetCallback("OnValueChanged", function(_,_, choise)
+		class.justify = choise
+		class.frame.text:SetJustifyH(class.justify)
+	end)
+	
+	DEFAULT_TRACKER_OPTIONS.ddwn_Align = ddwn_Align
+	--ddwn_Background_Container:AddChild(ddwn_Background)
+	
+	return DEFAULT_TRACKER_OPTIONS
+end
 
 ----------------------------------------
 -- Options Frame
@@ -1239,9 +1566,6 @@ local function _CreateOptionsFrames()
 	local Options_MainScroller = AceGUI:Create("ScrollFrame")
 	Options_MainScroller:SetLayout("Flow")
 	Options_MainScrollContainer:AddChild(Options_MainScroller)
-
--- Options List Info
-------------------------------------------------------------------------------------------------------------------------
 	
 
 -- Options Lists Container
@@ -1262,6 +1586,8 @@ local function _CreateOptionsFrames()
 	OptionFramesBG.divide:SetPoint("topleft", OptionFramesBG.top, "topleft",65,-25)
 	OptionFramesBG.divide:SetPoint("bottomleft", OptionFramesBG.bottom, "bottomleft", 65,24)
 
+	
+	
 -- Visible Frame Box
 ------------------------------------------------------------------------------------------------------------------------
 	local L_BGS_OptionFramesContainer = CreateFrame("frame", "BGS_OptionFramesContainer", L_BGS_ListsGroup.frame)
@@ -1292,24 +1618,82 @@ local function _CreateOptionsFrames()
 	BGS_FramesortBG_Info.text:SetPoint("top", 0, 15)
 	BGS_FramesortBG_Info.text:SetText("Track Options")
 
+-- New tracker options
+	
+	BGS_NewTrackerOptions = AceGUI:Create("SimpleGroup")
+	BGS_NewTrackerOptions:SetFullWidth(true)
+	BGS_NewTrackerOptions:SetWidth(185)
+	BGS_NewTrackerOptions:SetFullHeight(true)
+	BGS_NewTrackerOptions:SetHeight(170)
+	BGS_NewTrackerOptions:SetLayout("Flow")
+	BGS_NewTrackerOptions.frame:SetParent(BGS_FramesortBG_Info)
+	BGS_NewTrackerOptions.frame:SetPoint("topleft", BGS_FramesortBG_Info, "topleft", 0, 0)
+	BGS_NewTrackerOptions.frame:SetPoint("bottomright", BGS_FramesortBG_Info, "bottomright", 0, 0)
+	BGS_NewTrackerOptions.frame:Hide()
 
+	local infoEmpty2 = AceGUI:Create("SimpleGroup")
+	
+	infoEmpty2:SetFullWidth(true)
+	infoEmpty2:SetHeight(20);
+	BGS_NewTrackerOptions:AddChild(infoEmpty2)
+	
+	local txt_Name = AceGUI:Create("EditBox")
+	txt_Name:SetLabel("Type")
+	txt_Name:SetText(HonorFrame)
+	txt_Name:SetRelativeWidth(0.45)
+	BGS_NewTrackerOptions:AddChild(txt_Name)
+	
+	local txt_Create = AceGUI:Create("Button")
+	txt_Create:SetText("Create")
+	txt_Create:SetRelativeWidth(0.45)
+	txt_Create:SetCallback("OnClick", function(__,__,value)
+		--local frame = BGS_TrackerClasses:GetFrameByName(class.name)
+		CreateTrackerOfType(txt_Name:GetText())
+	end)
+	BGS_NewTrackerOptions:AddChild(txt_Create)
+	
+	local ShowCreateNewButton = CreateFrame("Button", "BGS_Options_CreateNewTracker", BGS_OptionFramesContainer)
+	--ShowCreateNewButton:SetHitRectInsets(4, 4, 4, 4)
+	--ShowCreateNewButton:SetNormalTexture("Interface\\BUTTONS\\UI-Panel-MinimizeButton-Up")
+	--ShowCreateNewButton:SetHighlightTexture("Interface\\BUTTONS\\UI-Panel-MinimizeButton-Highlight")
+	--ShowCreateNewButton:SetPushedTexture("Interface\\BUTTONS\\UI-Panel-MinimizeButton-Down")
+	ShowCreateNewButton:SetPoint("bottomleft", BGS_OptionFramesContainer, "bottomleft", 0, 0)
+	ShowCreateNewButton:SetPoint("bottomright", BGS_OptionFramesContainer, "bottomright", 0, 0)
+	ShowCreateNewButton:SetHeight(20)
+	--ShowCreateNewButton:SetPoint("bottomright", frameDetail.frame, "bottomright", -5, 5)
+	--FPS_CloseButton:Show()
+	ShowCreateNewButton:SetScript("OnClick",  function() 
+		if {BGS_FramesortBG_Info:GetChildren()} ~= nill	then
+				for k, child in ipairs({BGS_FramesortBG_Info:GetChildren()}) do
+					child:Hide()
+				end
+			end
+			
+			-- Place the info/options of the frame in the info box
+					BGS_NewTrackerOptions.frame:SetParent(BGS_FramesortBG_Info)
+					BGS_NewTrackerOptions.frame:SetPoint("topleft", BGS_FramesortBG_Info, "topleft", 0, 0)
+					BGS_NewTrackerOptions.frame:SetPoint("bottomright", BGS_FramesortBG_Info, "bottomright", 0, 0)
+					BGS_NewTrackerOptions.frame:Show()
+	end)
+	
+	
 -- Main Scrollcontainer
 ------------------------------------------------------------------------------------------------------------------------
 	
-	local test = AceGUI:Create("SimpleGroup")
-	test:SetFullWidth(true)
-	test:SetWidth(185)
-	test:SetFullHeight(true)
-	test:SetHeight(170)
-	test.frame:SetParent(BGS_FramesortBG_Info)
-	test.frame:SetPoint("topleft", BGS_FramesortBG_Info, "topleft", 0, 0)
-	test.frame:SetPoint("bottomright", BGS_FramesortBG_Info, "bottomright", 0, 0)
+	BGS_OptionDefaultInfo = AceGUI:Create("SimpleGroup")
+	BGS_OptionDefaultInfo:SetFullWidth(true)
+	BGS_OptionDefaultInfo:SetWidth(185)
+	BGS_OptionDefaultInfo:SetFullHeight(true)
+	BGS_OptionDefaultInfo:SetHeight(170)
+	BGS_OptionDefaultInfo.frame:SetParent(BGS_FramesortBG_Info)
+	BGS_OptionDefaultInfo.frame:SetPoint("topleft", BGS_FramesortBG_Info, "topleft", 0, 0)
+	BGS_OptionDefaultInfo.frame:SetPoint("bottomright", BGS_FramesortBG_Info, "bottomright", 0, 0)
 
 	local infoEmpty = AceGUI:Create("SimpleGroup")
 	infoEmpty:SetLayout("Fill")
 	infoEmpty:SetRelativeWidth(0.28)
 	infoEmpty:SetHeight(20);
-	test:AddChild(infoEmpty)
+	BGS_OptionDefaultInfo:AddChild(infoEmpty)
 	
 	local infoShowHide = AceGUI:Create("SimpleGroup")
 	infoShowHide:SetLayout("Fill")
@@ -1329,7 +1713,7 @@ local function _CreateOptionsFrames()
 	infoShowHide:SetHeight(infoShowHide.text:GetHeight()+10);
 	infoShowHide.text:SetJustifyH("left")
 	infoShowHide.text:SetPoint("left", BGS_Infotext1_Icon2,"right", 5, 0)
-	test:AddChild(infoShowHide)
+	BGS_OptionDefaultInfo:AddChild(infoShowHide)
 	
 	local infoOrder = AceGUI:Create("SimpleGroup")
 	infoOrder:SetLayout("Fill")
@@ -1349,7 +1733,7 @@ local function _CreateOptionsFrames()
 	infoOrder:SetHeight(infoOrder.text:GetHeight()+10);
 	infoOrder.text:SetJustifyH("left")
 	infoOrder.text:SetPoint("left", BGS_Infotext2_Icon2,"right", 5, 0)
-	test:AddChild(infoOrder)
+	BGS_OptionDefaultInfo:AddChild(infoOrder)
 	
 	local infoDetail = AceGUI:Create("SimpleGroup")
 	infoDetail:SetLayout("Fill")
@@ -1369,7 +1753,7 @@ local function _CreateOptionsFrames()
 	infoDetail:SetHeight(infoDetail.text:GetHeight()+10);
 	infoDetail.text:SetJustifyH("left")
 	infoDetail.text:SetPoint("left", BGS_Infotext3_Icon2,"right", 5, 0)
-	test:AddChild(infoDetail)
+	BGS_OptionDefaultInfo:AddChild(infoDetail)
 	
 	local infoReset = AceGUI:Create("SimpleGroup")
 	infoReset:SetLayout("Fill")
@@ -1389,7 +1773,7 @@ local function _CreateOptionsFrames()
 	infoReset:SetHeight(infoReset.text:GetHeight()+10);
 	infoReset.text:SetJustifyH("left")
 	infoReset.text:SetPoint("left", BGS_Infotext4_Icon2,"right", 5, 0)
-	test:AddChild(infoReset)
+	BGS_OptionDefaultInfo:AddChild(infoReset)
 	
 	local L_trackerInfoInfoButton = CreateFrame("Button", "BGS_trackerInfoInfoButton", BGS_OptionFramesContainerBG)
 	BGS_trackerInfoInfoButton:SetWidth(20)
@@ -1408,14 +1792,39 @@ local function _CreateOptionsFrames()
 			end
 			
 			-- Place the info/options of the frame in the info box
-					test.frame:SetParent(BGS_FramesortBG_Info)
-					test.frame:SetPoint("topleft", BGS_FramesortBG_Info, "topleft", 0, 0)
-					test.frame:SetPoint("bottomright", BGS_FramesortBG_Info, "bottomright", 0, 0)
-					test.frame:Show()
+					BGS_OptionDefaultInfo.frame:SetParent(BGS_FramesortBG_Info)
+					BGS_OptionDefaultInfo.frame:SetPoint("topleft", BGS_FramesortBG_Info, "topleft", 0, 0)
+					BGS_OptionDefaultInfo.frame:SetPoint("bottomright", BGS_FramesortBG_Info, "bottomright", 0, 0)
+					BGS_OptionDefaultInfo.frame:Show()
 					BGS_FramesortBG_Info.text:SetText("Track Options")
 			
 	end)
 	
+	
+	
+	
+	
+	--[[
+	local infoShowHide = AceGUI:Create("SimpleGroup")
+	infoShowHide:SetLayout("Fill")
+	infoShowHide:SetRelativeWidth(0.28)
+	infoShowHide.icon1 = infoShowHide.frame:CreateTexture("BGS_Infotext1_Icon1")
+	BGS_Infotext1_Icon1:SetTexture("Interface\\LFGFRAME\\BattlenetWorking0")
+	BGS_Infotext1_Icon1:SetPoint("topleft", infoShowHide.frame , "topleft",0, 0)
+	BGS_Infotext1_Icon1:SetPoint("bottomright", infoShowHide.frame , "topleft",20, -20)
+	BGS_Infotext1_Icon1:Show()
+	infoShowHide.icon2 = infoShowHide.frame:CreateTexture("BGS_Infotext1_Icon2")
+	BGS_Infotext1_Icon2:SetTexture("Interface\\LFGFRAME\\BattlenetWorking4")
+	BGS_Infotext1_Icon2:SetPoint("topleft", BGS_Infotext1_Icon1 , "topright",0, 0)
+	BGS_Infotext1_Icon2:SetPoint("bottomright", BGS_Infotext1_Icon1 , "topright",20, -20)
+	BGS_Infotext1_Icon2:Show()
+	infoShowHide.text = infoShowHide.frame:CreateFontString(nil, nil, FontCheckBox)
+	infoShowHide.text:SetText("Show or hide track options by clicking the\n eye icon.")
+	infoShowHide:SetHeight(infoShowHide.text:GetHeight()+10);
+	infoShowHide.text:SetJustifyH("left")
+	infoShowHide.text:SetPoint("left", BGS_Infotext1_Icon2,"right", 5, 0)
+	BGS_NewTrackerOptions:AddChild(infoShowHide)
+	]]--
 	--[[
 	
 	Want to add at some point in the future.
@@ -1448,145 +1857,7 @@ local function _CreateOptionsFrames()
 	end)
 ]]--
 
--- Create small Frame Options
-------------------------------------------------------------------------------------------------------------------------
 
-	for k,v in  ipairs(DefaultFrames) do
-		local trackName = "BGS_Optframe_"..v.detail
-		-- Create a small frame
-		local BGS_OptframeDefault = CreateFrame("Button", trackName, BGS_OptionFramesContainer)
-		BGS_OptframeDefault.tracker = v
-		BGS_OptframeDefault:SetPoint("left", BGS_OptionFramesContainer, 0, 0)
-		BGS_OptframeDefault:SetPoint("right", BGS_OptionFramesContainer, 0, 0)
-		BGS_OptframeDefault:SetHeight(20)
-		-- Default Background
-		BGS_OptframeDefault.bg = BGS_OptframeDefault:CreateTexture(trackName.."_BG")
-		BGS_OptframeDefault.bg:SetTexture("Interface\\CHATFRAME\\CHATFRAMEBACKGROUND")
-		BGS_OptframeDefault.bg:SetDrawLayer("background", 0)
-		BGS_OptframeDefault.bg:SetParent(BGS_OptframeDefault)
-		BGS_OptframeDefault.bg:SetPoint("topleft",BGS_OptframeDefault,  0, 0)
-		BGS_OptframeDefault.bg:SetPoint("bottomright",BGS_OptframeDefault, 0, 0)
-		BGS_OptframeDefault.bg:SetVertexColor(.2, .2, .2)
-		BGS_OptframeDefault.bg:SetAlpha(0.6)
-		--BGS_OptframeDefault.bg:SetPoint("left", BGS_OptframeDefault, "left", 0, 0)
-		BGS_OptframeDefault.bg:SetSize(BGS_OptframeDefault:GetWidth(),BGS_OptframeDefault:GetHeight()) 
-		BGS_OptframeDefault.bg:Show()
-		-- Selected frame Background
-		BGS_OptframeDefault.hl = BGS_OptframeDefault:CreateTexture(trackName.."_Highlight")
-		BGS_OptframeDefault.hl:SetTexture(nil)
-		BGS_OptframeDefault.hl:SetDrawLayer("background", 1)
-		BGS_OptframeDefault.hl:SetAlpha(1)
-		BGS_OptframeDefault.hl:SetParent(BGS_OptframeDefault)
-		BGS_OptframeDefault.hl:SetPoint("topleft", 0, 0)
-		BGS_OptframeDefault.hl:SetPoint("bottomright", 0, 0)
-		BGS_OptframeDefault.hl:SetSize(BGS_OptframeDefault:GetWidth(),BGS_OptframeDefault:GetHeight()) 
-		BGS_OptframeDefault.hl:Show()
-		--BGS_OptframeDefault:SetWidth(BGS_OptframeDefault:GetParent():GetWidth()-10)
-		BGS_OptframeDefault:SetHighlightTexture("Interface\\FriendsFrame\\UI-FriendsFrame-HighlightBar-Blue")
-		-- Face Text
-		BGS_OptframeDefault.text = BGS_OptframeDefault:CreateFontString(nil, nil, FontCheckBox)
-		BGS_OptframeDefault.text:SetPoint("left", 5, 0)
-		BGS_OptframeDefault.text:SetText(v.detail)
-		BGS_OptframeDefault:SetScript("OnClick",  function(self)
-			PlaySound("igMainMenuOptionCheckBoxOn");
-			local info = v.info
-			FixOptionFrames()
-			-- Reset all frames
-			for k, v in ipairs(OptionsFrame) do
-				v.bg:SetVertexColor(.2, .2, .2)
-				v.bg:SetTexCoord(0,1,0,1)
-				v.hl:SetTexture(nil)
-			end
-			
-			-- Give highlight to clicked frame
-			BGS_OptframeDefault.hl:SetTexture("Interface\\FriendsFrame\\UI-FriendsFrame-HighlightBar")
-			-- Change label of info box
-			BGS_FramesortBG_Info.text:SetText(BGS_OptframeDefault.text:GetText())
-			
-			-- Hide all children in info box
-			if {BGS_FramesortBG_Info:GetChildren()} ~= nill	then
-				for k, child in ipairs({BGS_FramesortBG_Info:GetChildren()}) do
-					child:Hide()
-				end
-			end
-			
-			-- Place the info/options of the frame in the info box
-			if v.options ~= nill then
-				for k, f in ipairs(v.options) do
-					f.frame:SetParent(BGS_FramesortBG_Info)
-					f.frame:SetPoint("topleft", BGS_FramesortBG_Info, "topleft", 0, 0)
-					f.frame:SetPoint("bottomright", BGS_FramesortBG_Info, "bottomright", 0, 0)
-					f.frame:Show()
-				end
-			end
-			
-		end)-- end of frame onclick function
-
-		OptionsFrame[#OptionsFrame+1] = BGS_OptframeDefault
-		--table.insert(OptionsFrame, BGS_OptframeDefault)
-
-		-- create up button
-		local moveUp = CreateFrame("Button", trackName.."_moveUp", BGS_OptframeDefault)
-		moveUp:SetWidth(OPTIONS_TINYBTN_SIZE)
-		moveUp:SetHeight(OPTIONS_TINYBTN_SIZE)
-		moveUp:SetNormalTexture("Interface\\CHATFRAME\\UI-ChatIcon-ScrollUp-Up")
-		moveUp:SetHighlightTexture("Interface\\CHATFRAME\\UI-ChatIcon-ScrollUp-Down")
-		moveUp:SetPushedTexture("Interface\\CHATFRAME\\UI-ChatIcon-ScrollUp-Down")
-		moveUp:SetPoint("left", trackName, "left", 122 +(15+1)*1, 0)
-		moveUp:SetScript("OnClick",  function(self)
-			PlaySound("igMainMenuOptionCheckBoxOn");
-			MoveUpInShown(k)
-			FixOptionFrames()
-		end)
-		moveUp:Hide()
-
-		-- create down button
-		local moveDown = CreateFrame("Button", trackName.."_moveDown", BGS_OptframeDefault)
-		moveDown:SetWidth(OPTIONS_TINYBTN_SIZE)
-		moveDown:SetHeight(OPTIONS_TINYBTN_SIZE)
-		moveDown:SetNormalTexture("Interface\\CHATFRAME\\UI-ChatIcon-ScrollDown-Up")
-		moveDown:SetHighlightTexture("Interface\\CHATFRAME\\UI-ChatIcon-ScrollDown-Down")
-		moveDown:SetPushedTexture("Interface\\CHATFRAME\\UI-ChatIcon-ScrollDown-Down")
-		moveDown:SetPoint("left", trackName, "left", 122 +(15+1)*2, 0)
-		moveDown:SetScript("OnClick",  function(self)
-			PlaySound("igMainMenuOptionCheckBoxOn");
-			MoveDownInShown(k)
-			FixOptionFrames()
-		end)
-		moveDown:Hide()
-
-		-- create move button 
-		local move = CreateFrame("Button", trackName.."_move", BGS_OptframeDefault)
-		move:SetWidth(OPTIONS_TINYBTN_SIZE)
-		move:SetHeight(OPTIONS_TINYBTN_SIZE)
-		--move:SetNormalTexture("Interface\\BUTTONS\\UI-SpellbookIcon-NextPage-Up")
-		move:SetHighlightTexture("Interface\\LFGFRAME\\BattlenetWorking2")
-		--move:SetPushedTexture("Interface\\BUTTONS\\UI-SpellbookIcon-NextPage-Down")
-		move:SetPoint("left", trackName, "left", 122, 0)
-		move:Show()
-		move:SetScript("OnClick",  function(self)
-			BGS_firstrunInfo:Hide()
-			PlaySound("igMainMenuOptionCheckBoxOn");
-			local parent = self:GetParent()
-			local btnUp, btnDown = parent:GetChildren()
-			-- swap frame between boxes
-			if (parent.tracker.visiPos > 0) then
-				--print(parent:GetName() .. " hidden")
-				HideFrame(k)
-				btnUp:Hide()
-				btnDown:Hide()
-			else
-				--print(parent:GetName() .. " shown")
-				btnUp:Show()
-				btnDown:Show()
-				ShowFrame(k)
-			end
-			parent:SetPoint("left", 0, 0)
-			parent:SetPoint("right", 0, 0)
-			FixOptionFrames()
-		end)
-		
-end -- end of for loop
 
 local L_BGS_MiscGroup = AceGUI:Create("SimpleGroup")
 	L_BGS_MiscGroup:SetFullWidth(true)
@@ -1675,7 +1946,7 @@ local L_BGS_MiscGroup = AceGUI:Create("SimpleGroup")
 			PlaySound("igMainMenuOptionCheckBoxOn");
 			for k, v in ipairs(DefaultFrames) do 
 				v.text:SetPoint("left", DEFAULT_TRACKOFFSET_WITH, 0)
-				if v.visiPos > 0 then
+				if v.visipos > 0 then
 					v.icon:Show()
 				end
 			end
@@ -1936,7 +2207,7 @@ local function CommonRunOLD()
 			print("BGstats: Unknown frame error, please reload the ui (/reload) to fix this issue.")
 			break;
 		end
-		f.visiPos = id
+		f.visipos = id
 	end
 	Options_PlaceShownFrames()
 	
@@ -1992,18 +2263,10 @@ local function CommonRun()
 		
 	end
 	
-	for  id, frame in ipairs(tempSavedData.ShownFrames) do 
-		local f = BGS_TrackerClasses:GetFrameByName(frame.name)
-		if f == -1 then
-			f = BGS_TrackerClasses:GetFrameByName(RenameOldSave(frame.name))
-		end
-		if f == -1 then
-			print("BGstats: Unknown frame error, please reload the UI (/reload) to fix this issue.")
-			break;
-		end
-		f.visiPos = frame.pos
+	for  id, save in ipairs(BGstats_ExtraFrameDataList) do 
+		CreateTrackerOfType(save.type, save)
 	end
-	Options_PlaceShownFrames()
+
 	
 	ddwn_Background:SetValue(tempSavedData.MainframeBackground)
 	
@@ -2039,11 +2302,15 @@ function BGS_LoadFrame:ADDON_LOADED(loadedAddon)
 	self:UnregisterEvent("ADDON_LOADED")
 	_CreateBaseFrame()
 	
-	for k, v in ipairs(BGS_TrackerClasses)do
+	--[[for k, v in ipairs(BGS_TrackerClasses)do
 		if (v.class) then
-			v.class:Create()
+		local temp = v.class("test1")
+		
+			table.insert(TestClasses, temp)
+			--v.class:Create()
 		end
-	end
+	end]]--
+	
 	
 	
 	
@@ -2061,8 +2328,9 @@ function BGS_LoadFrame:PLAYER_LOGIN(loadedAddon)
 	
 	
 	for i=0, table.getn(DefaultFrames) do
-		HideFrame(i+1)
+		--HideFrame(i+1)
 	end
+	
 	if BGstats_BaseDataList == nil then -- either no data or old data
 		if firstRun == nil then --not even old data so truely first run
 			Firstrun()
@@ -2073,8 +2341,13 @@ function BGS_LoadFrame:PLAYER_LOGIN(loadedAddon)
 		CommonRun()
 	end
 	
-	ResizeBG()
-    BGS_TrackerClasses:TrackFramePos()
+	--ResizeBG()
+    --BGS_TrackerClasses:TrackFramePos()
+	
+	for k, v in ipairs(TestClasses) do
+		print("before fix".. v.detail.." "..v.visipos)
+	end
+	
 	FixOptionFrames()
 	InterfaceOptions_AddCategory(BGS_Option)
 	
@@ -2095,20 +2368,11 @@ function BGS_LoadFrame:PLAYER_LOGOUT(loadedAddon)
 	
 	local tempTable = {}
 	
-	-- Frames are sorted and given a pos nr from scratch to catch errors
-	table.sort(DefaultFrames, function(a, b) if a.visiPos < b.visiPos then return true end end)
-	local count = 1
-	for  id, frame in ipairs(DefaultFrames) do 
-		if frame.visiPos > 0 then -- All frames that are currently shown 
-			local tempSave = {}
-			tempSave.name = string.gsub(frame:GetName(), "BGS_", "")
-			tempSave.pos = count
-			count = count + 1
-			tempTable[#tempTable + 1] = tempSave
-			--table.insert(tempTable, tempSave) -- Save framename
-		end
+	for id, tracker in ipairs(TestClasses) do 
+		table.insert(tempTable, tracker:GetSave())
 	end
-	tempSaveData.ShownFrames = tempTable
+	
+	BGstats_ExtraFrameDataList = tempTable
 	
 	BGstats_BaseDataList = tempSaveData
 	
@@ -2127,7 +2391,14 @@ local function slashcmd(msg, editbox)
 		SetShowMainframe(true)
 	elseif msg == 'lock' then
 		ToggleLockbutton()
+	elseif msg == 'create' then
+		--table.foreach(TestClasses,print)
+		
+		for k, v in ipairs(BGS_TrackerClasses)do
+			CreateTrackerOfType(v.fType)
 
+		end
+		
 	else
 		if ( not InterfaceOptionsFramePanelContainer.displayedPanel ) then
 			InterfaceOptionsFrame_OpenToCategory(CONTROLS_LABEL);
@@ -2138,3 +2409,101 @@ local function slashcmd(msg, editbox)
    end
 end
 SlashCmdList["PVPSTATS"] = slashcmd
+
+
+
+
+
+-- Debug help
+----------------------------------------------
+
+local _updateTimer = 0
+
+function debug_updatext()
+	local text = ""
+	
+	--counters
+	text = text .. "created: " .. _CreatedFrameCounter .. " alive " .. #TestClasses .. "\n"
+	
+	--trackers
+	for k, v in ipairs(TestClasses)do
+		text = text .. v.detail .. " " .. v.visipos .. " " .. v.frameNr .. "\n"
+		text = text .. v.name .. "\n" .. "\n"
+		
+	end
+	
+	BGS_DEBUG.text:SetText(text)
+end
+
+local L_BGS_DEBUG = CreateFrame("frame", "BGS_DEBUG", UIParent)
+local function UpdateMainFrameBG()
+	if BGS_DEBUG:IsMouseEnabled() then
+		mainEdgefile = DEFAULT_EDGEFILE
+	else
+		mainEdgefile = nill
+	end
+	BGS_DEBUG:SetBackdrop({bgFile = DEFAULT_BG,
+      edgeFile = mainEdgefile,
+	  tileSize = 0, edgeSize = 16,
+      insets = { left = 3, right = 3, top = 3, bottom = 3 }
+	  })
+end
+	 UpdateMainFrameBG()
+
+BGS_DEBUG:SetFrameLevel(5)
+BGS_DEBUG:SetMovable(true)
+BGS_DEBUG:SetPoint("Center", 250, 0)
+BGS_DEBUG:RegisterForDrag("LeftButton")
+BGS_DEBUG:SetScript("OnDragStart", BGS_DEBUG.StartMoving )
+BGS_DEBUG:SetScript("OnDragStop", BGS_DEBUG.StopMovingOrSizing)
+BGS_DEBUG.text = BGS_DEBUG:CreateFontString(nil, nil, "GameFontNormal")
+BGS_DEBUG.text:SetPoint("topleft", 10, -10)
+BGS_DEBUG.text:SetJustifyH("left")
+BGS_DEBUG:SetWidth(65)
+BGS_DEBUG:SetHeight(BGS_DEBUG.text:GetStringHeight()+20)
+BGS_DEBUG:SetClampedToScreen(true)
+BGS_DEBUG:SetScript("OnUpdate", function(self,elapsed) 
+	_updateTimer = _updateTimer + elapsed
+	if _updateTimer >= 0.5 then
+		debug_updatext()
+		_updateTimer = 0
+	end
+	end)
+BGS_DEBUG:Show()
+
+local function DebugToggleLockbutton() 
+	if BGS_DEBUG:IsMouseEnabled() then
+		FPS_MoveButton.tex:SetVertexColor(DEFAULT_LOCKVERTEX_OFF, DEFAULT_LOCKVERTEX_OFF, DEFAULT_LOCKVERTEX_OFF )
+		PlaySound("igMainMenuOptionCheckBoxOff");
+		BGS_DEBUG:EnableMouse(false)
+			
+	else	
+		FPS_MoveButton.tex:SetVertexColor(DEFAULT_LOCKVERTEX_ON, DEFAULT_LOCKVERTEX_ON, DEFAULT_LOCKVERTEX_ON )
+		PlaySound("igMainMenuOptionCheckBoxOn");
+		BGS_DEBUG:EnableMouse(true)
+			
+	end
+		UpdateMainFrameBG()
+end
+
+local L_BGS_DEBUG_MoveButton = CreateFrame("Button", "BGS_DEBUG_MoveButton", BGS_DEBUG)
+BGS_DEBUG_MoveButton:SetWidth(8)
+BGS_DEBUG_MoveButton:SetHeight(8)
+BGS_DEBUG_MoveButton.tex = BGS_DEBUG_MoveButton:CreateTexture("FPS_MoveButton_Tex")
+BGS_DEBUG_MoveButton.tex:SetTexture("Interface\\COMMON\\UI-ModelControlPanel")
+BGS_DEBUG_MoveButton.tex:SetPoint("topleft", BGS_DEBUG, "topleft", 5, -5)
+BGS_DEBUG_MoveButton.tex:SetTexCoord(18/64, 36/64, 37/128, 53/128)
+BGS_DEBUG_MoveButton.tex:SetSize(8,8)
+BGS_DEBUG_MoveButton.tex:SetVertexColor(.8, .8, .8 ) 
+
+BGS_DEBUG_MoveButton:SetPoint("topleft", BGS_DEBUG, "topleft", 5, -5)
+BGS_DEBUG_MoveButton:Show()
+
+BGS_DEBUG_MoveButton:SetScript("OnClick",  function() 
+	DebugToggleLockbutton()
+	
+end)
+BGS_DEBUG_MoveButton:SetScript("OnEnter",  function() 
+	BGS_DEBUG_MoveButton.tex:SetVertexColor(1, 1, 1 )
+	
+end)

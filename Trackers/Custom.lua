@@ -6,6 +6,16 @@
 -- General Tracker variables
 local AceGUI = LibStub("AceGUI-3.0")
 local addonName, BGS_TrackerClasses = ...
+local TestClass = {}
+TestClass.__index = TestClass
+setmetatable(TestClass, {
+  __call = function (cls, ...)
+    return cls.new(...)
+  end,
+})
+
+local _type = "Custom"
+
 local TrackerClass = {}
 TrackerClass.name = "Custom"
 TrackerClass.detail = "Custom"
@@ -15,14 +25,11 @@ TrackerClass.options = {}
 TrackerClass.colSpan = 1
 TrackerClass.justify = "left"
 TrackerClass.frame = nil
-local _defaultOPtions = BGS_TrackerClasses:CreateDefaultTrackerOptions()
-BGS_TrackerClasses[#BGS_TrackerClasses + 1] = {class = TrackerClass}
+--local _defaultOPtions = BGS_TrackerClasses:CreateDefaultTrackerOptions()
+table.insert(BGS_TrackerClasses, {fType = _type, class = TestClass })
 --table.insert(BGS_TrackerClasses, {class = TrackerClass})
 -- Tracker Specific variables
-local _updateTimer = 0
-local _keyFormat = "|cFFFFCC00%s|r : %s"
-local _baseString = "$sb2 ($sb1) / $sb3   D: $sb4 ($sbr4)   H: $sb5 ($sbr5)"
-local _currentBG = ""
+
 local _replaceKeys = { {key ="Misc", value = "", header = true, info="Misc options"}
 						,{key ="$hk1", value = function() return BGS_TrackerClasses:GetHKills()end, info="Character honorable kills"}--BGS_TrackerClasses:GetHKills()
 						,{key ="$hk2", value = function() return BGS_TrackerClasses:GetAccHKills() end, info="Account honorable kills"}
@@ -100,31 +107,50 @@ local _replaceKeys = { {key ="Misc", value = "", header = true, info="Misc optio
 
 --------------------------------------------------------------------------------
 -- General Tracker Methods
---------------------------------------------------------------------------------
+--------------------------------------------------------------------------------							
 
-function TrackerClass:SetColspan(cols, maxCols)
-	TrackerClass.colSpan = cols
-	_defaultOPtions.sl_ColSpan:SetSliderValues(1, maxCols, 1)
-	_defaultOPtions.sl_ColSpan:SetValue(TrackerClass.colSpan)
-end										
-
-local function updateKeyString()
-	local tempString = _baseString
-	local strgsub = string.gsub
-	local strfind = string.find
+local function eventHandle(class, self, event, addon)
 	
-	for i=1, #_replaceKeys do
-		local value = _replaceKeys[i]
-		if not value.header and strfind(tempString, value.key) then
-		tempString = strgsub(tempString, value.key, value.value)
+	if event == "UPDATE_BATTLEFIELD_SCORE" then
+		-- only update when actually shown to save memory in battlegrounds
+		if TrackerClass.frame:IsShown() then
+			class:updateKeyString()
 		end
 	end
 	
-	TrackerClass.frame.text:SetText(tempString)
-	tempString = nil
-end	
+	if event == "PLAYER_ENTERING_WORLD" or event == "UPDATE_BATTLEFIELD_STATUS"  then
+		class._currentBG = ""
+		local isInstance, instanceType = IsInInstance()
+		if instanceType == "pvp" then
+			local name = GetInstanceInfo()
+			class._currentBG = name
+			
+		end
+		class:updateKeyString()
+		return
+	end
 
-local function CreateSpecificOptions()
+	if event == "PLAYER_PVP_KILLS_CHANGED" then
+		class:updateKeyString()
+		return
+	end
+	
+	if event == "CURRENCY_DISPLAY_UPDATE" then
+		class:updateKeyString()
+	end
+end
+
+local function CreateUpdateFrame(class)
+	local _eventsFrame = CreateFrame("FRAME", "BGS_"..class.detail.."Events");
+	_eventsFrame:RegisterEvent("UPDATE_BATTLEFIELD_SCORE");
+	_eventsFrame:RegisterEvent("UPDATE_BATTLEFIELD_STATUS");
+	_eventsFrame:RegisterEvent("PLAYER_PVP_KILLS_CHANGED");
+	_eventsFrame:RegisterEvent("PLAYER_ENTERING_WORLD");
+	_eventsFrame:RegisterEvent("CURRENCY_DISPLAY_UPDATE");
+	_eventsFrame:SetScript("OnEvent", function(self, event, ...) eventHandle(class, self, event, ...) end)
+end
+
+local function CreateSpecificOptions(class)
 						
 	local scrollcontainer = AceGUI:Create("SimpleGroup")
 	scrollcontainer:SetFullWidth(true)
@@ -133,42 +159,28 @@ local function CreateSpecificOptions()
 	scrollcontainer:SetHeight(170)
 	scrollcontainer:SetLayout("Fill")
 
-	TrackerClass.options[#TrackerClass.options + 1] = scrollcontainer
+	--TrackerClass.options[#TrackerClass.options + 1] = scrollcontainer
 	--table.insert(TrackerClass.options, scrollcontainer)
 
 	local scroll = AceGUI:Create("ScrollFrame")
 	scroll:SetLayout("Flow")
 	scrollcontainer:AddChild(scroll)
 	
-	-- Tracker Info
-	_defaultOPtions.frameDetail.text:SetText(TrackerClass.info)
-	scroll:AddChild(_defaultOPtions.frameDetail)
-	
-	-- Tracker Slider
-	_defaultOPtions.sl_ColSpan:SetCallback("OnValueChanged", function(__,__,value)
-		local frame = BGS_TrackerClasses:GetFrameByName(TrackerClass.name)
-		frame.colSpan = tonumber(value)
-		BGS_TrackerClasses:TrackFramePos()
-	end)
-	scroll:AddChild(_defaultOPtions.sl_ColSpan)
-
-	-- Tracker Text Alignment
-	_defaultOPtions.ddwn_Align:SetCallback("OnValueChanged", function(_,_, choise)
-		TrackerClass.justify = choise
-		TrackerClass.frame.text:SetJustifyH(TrackerClass.justify)
-	end)
-	scroll:AddChild(_defaultOPtions.ddwn_Align)
+	scroll:AddChild(class._defaultOPtions.txt_Name)
+	scroll:AddChild(class._defaultOPtions.frameDetail)
+	scroll:AddChild(class._defaultOPtions.sl_ColSpan)
+	scroll:AddChild(class._defaultOPtions.ddwn_Align)
 
 	local txt_Input = AceGUI:Create("EditBox")
 	txt_Input:SetLabel("Custom text")
-	txt_Input:SetText(_baseString)
+	txt_Input:SetText(class._baseString)
 	txt_Input:SetFullWidth(true)
 	txt_Input:SetCallback("OnTextChanged", function(__,__, value)
-		_baseString = value
+		class._baseString = value
 		--print(value)
-		updateKeyString()
+		class:updateKeyString()
 	end)
-	TrackerClass.options.txt_Input = txt_Input
+	--self.options.txt_Input = txt_Input
 	scroll:AddChild(txt_Input)
 	
 	local countForBg = 0
@@ -228,12 +240,93 @@ local function CreateSpecificOptions()
 		end
 	end
 	
+	return scrollcontainer
+	
 end
 
-function TrackerClass:Create()
-	TrackerClass.frame = BGS_TrackerClasses:CreateTrackerFrame(TrackerClass)
-	CreateSpecificOptions()
+
+function TestClass.new(name, id, save)
+  local self = setmetatable({}, TestClass)
+	self.name = name
+	self.detail = "frame_"..id
+	self.icon = "Interface\\ICONS\\INV_Scroll_07"
+	self.info = "Customise your own tracker using given options"
+	self.options = {}
+	self.frameNr = id
+	self.visipos = -1
+	self.colSpan = 1
+	self.justify = "left"
+	self._updateTimer = 0
+	self._keyFormat = "|cFFFFCC00%s|r : %s"
+	self._baseString = "$sb2 ($sb1) / $sb3   D: $sb4 ($sbr4)   H: $sb5 ($sbr5)"
+	self._currentBG = ""
+	self.type = _type
+	
+	if save ~= nil then
+		self:LoadSave(save)
+	end
+	print("creating".. self.detail.." "..self.visipos)
+	
+	self.frame = BGS_TrackerClasses:CreateTrackerFrame(self)
+	print("after frame "..self.visipos)
+	self.optionFrame = BGS_TrackerClasses:createSmallFrame(self)
+	
+	self._defaultOPtions = BGS_TrackerClasses:CreateDefaultTrackerOptions(self)
+	
+	CreateUpdateFrame(self)
+	
+	table.insert(self.options, CreateSpecificOptions(self))
+	
+	self:updateKeyString()
+  return self
 end
+
+function TestClass:GetSave()
+	local save = {}
+	save.name = self.name
+	save.visipos = self.visipos
+	save.colSpan = self.colSpan
+	save.justify = self.justify
+	save.type = self.type
+	save.baseString = self._baseString
+
+	return save
+end
+
+function TestClass:LoadSave(save)
+	self.name = save.name
+	self.visipos = save.visipos
+	self.colSpan = save.colSpan
+	self.justify = save.justify
+	self._baseString = save.baseString
+end
+
+function TestClass:SetColspan(cols, maxCols)
+	self.colSpan = cols
+	self._defaultOPtions.sl_ColSpan:SetSliderValues(1, maxCols, 1)
+	self._defaultOPtions.sl_ColSpan:SetValue(self.colSpan)
+end
+
+
+
+function TestClass:updateKeyString()
+
+	local tempString = self._baseString
+	--print(self.name .. ": " .. tempString)
+	local strgsub = string.gsub
+	local strfind = string.find
+	
+	for i=1, #_replaceKeys do
+		local value = _replaceKeys[i]
+		if not value.header and strfind(tempString, value.key) then
+		tempString = strgsub(tempString, value.key, value.value)
+		end
+	end
+	
+	self.frame.text:SetText(tempString)
+	tempString = nil
+end	
+
 
 --------------------------------------------------------------------------------
 -- Tracker Specific Methods
@@ -254,161 +347,4 @@ end
 -- Event Handling
 --------------------------------------------------------------------------------
 
-local function eventHandle(self, event, addon)
 
-	if event == "PLAYER_LOGIN" then
-		
-		
-		local extra = BGS_TrackerClasses:GetInfoList(TrackerClass.name)
-		if extra then
-			-- Default options
-			if (extra.colSpan) then
-				TrackerClass.colSpan = extra.colSpan
-			end
-			TrackerClass.frame.colSpan = TrackerClass.colSpan
-			_defaultOPtions.sl_ColSpan:SetValue(TrackerClass.colSpan)
-			BGS_TrackerClasses:TrackFramePos()
-			if (extra.justify) then
-				TrackerClass.justify = extra.justify
-			end
-			_defaultOPtions.ddwn_Align:SetValue(TrackerClass.justify)
-			TrackerClass.frame.text:SetJustifyH(TrackerClass.justify)
-			
-			-- Specific options
-			if(extra.baseString) then
-				_baseString = extra.baseString
-				TrackerClass.options.txt_Input:SetText(_baseString)
-			end
-		end
-		updateKeyString()
-	end
-
-	if event == "ADDON_LOADED" then
-		if addon ~= addonName then return end
-		self:UnregisterEvent("ADDON_LOADED")	
-		return
-	end
-	
-	if event == "PLAYER_LOGOUT" then
-		table.insert(BGstats_ExtraFrameDataList, {frame = TrackerClass.name, colSpan = TrackerClass.colSpan, justify = TrackerClass.justify, baseString = _baseString})
-	end
-	
-	if event == "UPDATE_BATTLEFIELD_SCORE" then
-		-- only update when actually shown to save memory in battlegrounds
-		if TrackerClass.frame:IsShown() then
-			updateKeyString()
-		end
-	end
-	
-	if event == "PLAYER_ENTERING_WORLD" or event == "UPDATE_BATTLEFIELD_STATUS"  then
-		_currentBG = ""
-		local isInstance, instanceType = IsInInstance()
-		if instanceType == "pvp" then
-			local name = GetInstanceInfo()
-			_currentBG = name
-			
-		end
-		updateKeyString()
-		return
-	end
-
-	if event == "PLAYER_PVP_KILLS_CHANGED" then
-		updateKeyString()
-	return
-	end
-end
-
-local _eventsFrame = CreateFrame("FRAME", "BGS_"..TrackerClass.name.."Events");
-_eventsFrame:RegisterEvent("PLAYER_LOGIN");
-_eventsFrame:RegisterEvent("PLAYER_LOGOUT");
-_eventsFrame:RegisterEvent("PLAYER_PVP_KILLS_CHANGED");
-_eventsFrame:RegisterEvent("ADDON_LOADED");
-_eventsFrame:RegisterEvent("PLAYER_ENTERING_WORLD");
-_eventsFrame:RegisterEvent("CURRENCY_DISPLAY_UPDATE");
---_eventsFrame:RegisterEvent("UPDATE_BATTLEFIELD_STATUS");
---_eventsFrame:RegisterEvent("UPDATE_BATTLEFIELD_SCORE");
-_eventsFrame:SetScript("OnEvent", function(self, event, ...) self[event](self, ...) end)
---_eventsFrame:SetScript("OnEvent", function(self, event, ...) eventHandle(self, event, ...) end)
-
-function _eventsFrame:ADDON_LOADED(self, loadedAddon)
-	if addon ~= addonName then return end
-	self:UnregisterEvent("ADDON_LOADED")	
-	
-end
-
-function _eventsFrame:PLAYER_LOGIN()
-	local extra = BGS_TrackerClasses:GetInfoList(TrackerClass.name)
-		if extra then
-			-- Default options
-			if (extra.colSpan) then
-				TrackerClass.colSpan = extra.colSpan
-			end
-			TrackerClass.frame.colSpan = TrackerClass.colSpan
-			_defaultOPtions.sl_ColSpan:SetValue(TrackerClass.colSpan)
-			BGS_TrackerClasses:TrackFramePos()
-			if (extra.justify) then
-				TrackerClass.justify = extra.justify
-			end
-			_defaultOPtions.ddwn_Align:SetValue(TrackerClass.justify)
-			TrackerClass.frame.text:SetJustifyH(TrackerClass.justify)
-			
-			-- Specific options
-			if(extra.baseString) then
-				_baseString = extra.baseString
-				TrackerClass.options.txt_Input:SetText(_baseString)
-			end
-		end
-		updateKeyString()
-		
-		
-end
-
-function _eventsFrame:PLAYER_LOGOUT()
-	table.insert(BGstats_ExtraFrameDataList, {frame = TrackerClass.name, colSpan = TrackerClass.colSpan, justify = TrackerClass.justify, baseString = _baseString})
-end
-
-function _eventsFrame:PLAYER_PVP_KILLS_CHANGED()
-	updateKeyString()
-end
-
-function _eventsFrame:PLAYER_ENTERING_WORLD()
-		--local isInstance, instanceType = IsInInstance()
-		local name, instanceType = GetInstanceInfo()
-		if instanceType == "pvp" or instanceType == "arena" then
-			_currentBG = name
-			TrackerClass.frame:SetScript("OnUpdate", function(self,elapsed) 
-				_updateTimer = _updateTimer + elapsed
-				if _updateTimer >= 2 then
-					updateKeyString()
-					_updateTimer = 0
-				end
-			end)
-		else
-			
-			TrackerClass.frame:SetScript("OnUpdate", function(self,elapsed) 
-			return
-			end)
-			_currentBG = ""
-			if select(2,GetPVPRewards()) == 0 then
-				TrackerClass.frame:SetScript("OnUpdate", function(self,elapsed) 
-				_updateTimer = _updateTimer + elapsed
-				if _updateTimer >= 1 then
-					if select(2,GetPVPRewards()) ~= 0 then
-						updateKeyString()
-						TrackerClass.frame:SetScript("OnUpdate", function(self,elapsed) return end)
-					end
-					_updateTimer = 0
-				end
-				
-			end)
-				
-			end
-		end
-		updateKeyString()
-		
-		
-end
-
-function _eventsFrame:CURRENCY_DISPLAY_UPDATE(self, addon)
-	updateKeyString()
-end
