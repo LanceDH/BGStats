@@ -24,11 +24,14 @@ local DEFAULT_LOCKVERTEX_ON = 0.8
 local OPTIONS_TINYBTN_SIZE = 20
 local DEFAULT_TRACKER_WIDTH = 105
 local DEFAULT_TRACKER_HEIGHT = 20
+local MAXFRAMES = 15;
 local _TrackColumns = 1
 local _CreatedFrameCounter = 0
 
 local DEFAULT_BG = "Interface\\DialogFrame\\UI-DialogBox-Background"
 local DEFAULT_EDGEFILE = "Interface\\DialogFrame\\UI-DialogBox-Border"
+local TEX_TOOLTIPBORDER = "Interface\\GLUES\\COMMON\\Glue-Tooltip-Border"
+local TEX_TOOLTIPBG = "Interface\\GLUES\\COMMON\\Glue-Tooltip-Background"
 
 local mainBGBack = "Interface\\DialogFrame\\UI-DialogBox-Background"
 local mainEdgefile = nill
@@ -115,6 +118,7 @@ local DEFAULT_ALIGNMENTS = {options = {["left"] = "Left"
 								}			
 						}
 
+local TrackerTypeList = {}
 						
 local _battlefieldInfo = {{name="Random Battlegrounds", isRated=false, isHeader = true, instanceType="battleground", totalID=839, winID=840, icon = "Interface\\ICONS\\Achievement_BG_KillFlagCarriers_grabFlag_CapIt"}
 				,{name="Warsong Gulch", isRated=false, instanceType="battleground", totalID=52, winID=105, icon = "Interface\\ICONS\\INV_Misc_Rune_07"}
@@ -171,12 +175,55 @@ local L_BGS_CBHideIcons = nil
 local L_BGS_CBHideTitle = nil
 local L_BGS_SLColumns = nil
 
+BGS_TrackerClasses.tooltip = CreateFrame("frame", "BGS_Tooltip", UIParent)
+ 
+BGS_TrackerClasses.tooltip:SetBackdrop({bgFile = TEX_TOOLTIPBG,
+      edgeFile = TEX_TOOLTIPBORDER,
+	  tileSize = 0, edgeSize = 16,
+      insets = { left = 8, right = 5, top = 5, bottom = 8 }
+	  })
 
-----------------------------------------
--- Addon Wide functions
-----------------------------------------
+BGS_TrackerClasses.tooltip:SetFrameStrata("high")
+BGS_TrackerClasses.tooltip:SetFrameLevel(60)
+BGS_TrackerClasses.tooltip:SetPoint("center", UIParent)
+BGS_TrackerClasses.tooltip:SetWidth(160)
+BGS_TrackerClasses.tooltip:SetHeight(38)
+BGS_TrackerClasses.tooltip:Hide()
 
+BGS_TrackerClasses.tooltip.text = BGS_TrackerClasses.tooltip:CreateFontString(nil, nil, "GameFontHighlight")
+BGS_TrackerClasses.tooltip.text:SetPoint("topleft", 15, -10)
+BGS_TrackerClasses.tooltip.text:SetJustifyH("left")
+BGS_TrackerClasses.tooltip.text:SetJustifyV("top")
+BGS_TrackerClasses.tooltip.text:SetText("Information goes here")
 
+function BGS_TrackerClasses.tooltip:ShowTooltip(parent, text)
+	if parent == nil then
+		return
+	end
+	self.text:SetWidth(0)
+	self.text:SetHeight(0)
+	self.text:SetWordWrap(false)
+	--self:SetPoint("bottomleft", parent, "topright", 0, -5)
+	--self:SetPoint("left", parent, "right", 0, 5)
+	self:SetPoint("topleft", parent, "bottomleft", 0, -10)
+	self:SetFrameLevel(60)
+	self:Show()
+	self.text:SetText(text)
+	if self.text:GetWidth() > 200 then
+		self.text:SetWidth(200)
+		self.text:SetWordWrap(true)
+	end
+	BGS_TrackerClasses.tooltip:SetWidth(self.text:GetWidth() + 40)
+	BGS_TrackerClasses.tooltip:SetHeight(self.text:GetHeight() + 25)
+end
+
+function BGS_TrackerClasses.tooltip:HideTooltip()
+	self:Hide()
+	self.text:SetText("")
+	BGS_TrackerClasses.tooltip:SetWidth(40)
+end
+
+BGS_TrackerClasses.tooltip:ShowTooltip(nil, "Some text larger than the last one")
 
 local function CreateOptionsContainer(name, parent, height, title)
 	
@@ -309,6 +356,17 @@ function BGS_TrackerClasses:GetConquestcap(bracked, limit)
 	end
 	
 	return -1
+end
+
+function BGS_TrackerClasses:CountVisibleTrackers()
+	local count = 0
+	for k, v in ipairs(TestClasses) do
+		if v.visipos > 0 then
+			count = count + 1
+		end
+	end
+	
+   return count
 end
 
 function BGS_TrackerClasses:GetRatedInfo(bracket, option)
@@ -506,7 +564,13 @@ function BGS_TrackerClasses:BGS_GetWinrateString(name, display, rated)
 				else
 					win = GetStatistic(v.winID)
 					total = GetStatistic(v.totalID)
-					if total == "--" or total == 0 or win == "--" then
+					
+					if win == "--" then
+						win = 0
+					end
+					
+					if total == "--" or total == 0 then
+						--win = 0
 						winrate = 0
 						loss = 0
 					else
@@ -529,6 +593,12 @@ function BGS_TrackerClasses:BGS_GetWinrateString(name, display, rated)
 			if display == "rate" then
 				return string.format("%.1f %%", winrate)
 			end
+			if display == "wins" then
+				return string.format("%.1d", win)
+			end
+			if display == "losses" then
+				return string.format("%.1d", loss)
+			end
 		else
 			if display == "full" or display == nil then
 				return "-- : -- (--%)"
@@ -538,6 +608,12 @@ function BGS_TrackerClasses:BGS_GetWinrateString(name, display, rated)
 			end
 			if display == "rate" then
 				return "--%"
+			end
+			if display == "wins" then
+				return "--"
+			end
+			if display == "losses" then
+				return "--"
 			end
 		end
 
@@ -763,8 +839,12 @@ local function ChangeBG(bg)
 	UpdateMainFrameBG()
 end
 
-local function ResizeBG(totalHeight)
+local function ResizeBG(totalHeight, cols)
 	local BGSize = 4--10
+	if cols < 1 then
+		cols = 1
+	end
+	
 	if BGS_FrameTitle:IsShown() then
 		BGSize = BGSize + BGS_FrameTitle:GetHeight()
 	end
@@ -786,12 +866,15 @@ local function ResizeBG(totalHeight)
 		BGSize = BGSize + totalHeight
 	end
 	BGStatFrame:SetHeight(BGSize)
-	BGStatFrame:SetWidth(DEFAULT_TRACKER_WIDTH * _TrackColumns+2)
+	BGStatFrame:SetWidth(DEFAULT_TRACKER_WIDTH * cols+2)
 	return true
 end
 
 function BGS_TrackerClasses:TrackFramePos()
 	local spacing = -2---6
+	local usedColsMax = 1;
+	local usedColsCount = 0;
+	local maxRows = L_BGS_SLColumns:GetValue()
 	if BGS_FrameTitle:IsShown() then
 		spacing = spacing - BGS_FrameTitle:GetHeight()
 	end
@@ -810,41 +893,57 @@ function BGS_TrackerClasses:TrackFramePos()
 	-- place frames at their position
 	local count = 0;
 	for  k, frame in ipairs(shownArr) do
-		--print("name: "..shownArr.name)
 		--failsafe
 		if frame.colSpan == nil then
 			frame.colSpan = 1
 		end
 		--resize trackers bigger than frame
-		if frame.colSpan > _TrackColumns then
-			frame.colSpan = _TrackColumns
+		if frame.colSpan > maxRows then
+			frame.colSpan = maxRows
 		end
+		
+		
+		
 		--count for trackers pushed to new line
-		local freeSpace = _TrackColumns - count % _TrackColumns
+		local freeSpace = maxRows - count % maxRows
 		if frame.colSpan > freeSpace then
 			count = count + freeSpace
+			usedColsCount =  0
+			
 		end
+		
+		--count used rows
+		usedColsCount = usedColsCount + frame.colSpan
+		if usedColsCount > maxRows then
+			usedColsCount = 0
+		end
+		
+		if usedColsMax < usedColsCount then
+			usedColsMax = usedColsCount
+		end
+		
 		--change sliders max for trackers
 		local TempFrame = frame
 		
 		--resize trackers to their columns
 		frame:SetWidth(DEFAULT_TRACKER_WIDTH * frame.colSpan)
 		--place frames
-		local yPos = ((count)%_TrackColumns) * DEFAULT_TRACKER_WIDTH
-		local xPos = math.floor((count)/_TrackColumns) * -TempFrame:GetHeight()
+		local yPos = ((count)%maxRows) * DEFAULT_TRACKER_WIDTH
+		local xPos = math.floor((count)/maxRows) * -TempFrame:GetHeight()
 		count = count + frame.colSpan
 		TempFrame:SetPoint("topleft", BGStatFrame, "topleft", yPos, spacing + xPos)
 		--spacing = spacing - TempFrame:GetHeight()
 		TempFrame:Show()
 	end
 	
-	ResizeBG(math.ceil((count)/_TrackColumns) * DEFAULT_TRACKER_HEIGHT)
+	
+	ResizeBG(math.ceil((count)/maxRows) * DEFAULT_TRACKER_HEIGHT, usedColsMax)
 end
 
 
 
-local function DoShowFrames()
--- Show every frame and their icons in chosen.
+local function ShowVisibleTrackers()
+-- Show every frame and their icons if chosen.
 	for k, v in ipairs(TestClasses) do
 		v.frame:Show()
 		if L_BGS_CBHideIcons:GetValue() then
@@ -853,7 +952,7 @@ local function DoShowFrames()
 	end
 end
 
-local function DoHiddenFrames()
+local function HideHiddenTrackers()
 -- Hide All frames that shouldn't be shown
 	for k, v in ipairs(TestClasses) do
 		if v.visipos == 0 then
@@ -1081,31 +1180,41 @@ local function MoveDownInShown(frameNr)
 	TestClasses[key].visipos = pos
 end
 
-local function SetMaxColums(maxNr)
+local function SetMaxColums(maxNr, frameWasRemoved)
 	if maxNr <= 1 then
 		maxNr = 1
 	end
 
+	maxNr = MAXFRAMES
 
 	local current = L_BGS_SLColumns:GetValue()
 	L_BGS_SLColumns:SetSliderValues(1, maxNr, 1)
+	if frameWasRemoved and current > maxNr then
+		current = maxNr
+		_TrackColumns = maxNr
+	end
 	L_BGS_SLColumns:SetValue(current)
 	
 	
 	
 	for k, class in ipairs(TestClasses) do
 		if class ~= nil then
+			if frameWasRemoved and class.colSpan > current then
+				class:SetColspan(current, current);
+			end
+			
 			class:SetColspan(class.colSpan, current);
 		end
 	end
 end
 
 local function FixOptionFrames()
-	DoShowFrames()
-	DoHiddenFrames()
+	SetMaxColums(BGS_TrackerClasses:CountVisibleTrackers())
+	ShowVisibleTrackers()
+	HideHiddenTrackers()
 	Options_PlaceShownFrames()
 	BGS_TrackerClasses:TrackFramePos()
-	SetMaxColums(#TestClasses)
+	
 	--ResizeBG()
 end
 
@@ -1180,7 +1289,7 @@ function BGS_TrackerClasses:createSmallFrame(v)
 					f.frame:Show()
 				end
 			else
-				print("Options are nill")
+				--print("Options are nill")
 			end
 			
 		end)-- end of frame onclick function
@@ -1203,6 +1312,12 @@ function BGS_TrackerClasses:createSmallFrame(v)
 			FixOptionFrames()
 		end)
 		moveUp:Hide()
+		moveUp:SetScript("OnEnter",  function(self) 
+			BGS_TrackerClasses.tooltip:ShowTooltip(self, "Move this tracker up in the list.")
+		end)
+		moveUp:SetScript("OnLeave",  function() 
+			BGS_TrackerClasses.tooltip:HideTooltip()
+		end)
 
 		-- create down button
 		local moveDown = CreateFrame("Button", trackName.."_moveDown", BGS_OptframeDefault)
@@ -1219,6 +1334,13 @@ function BGS_TrackerClasses:createSmallFrame(v)
 			FixOptionFrames()
 		end)
 		moveDown:Hide()
+		
+		moveDown:SetScript("OnEnter",  function(self) 
+			BGS_TrackerClasses.tooltip:ShowTooltip(self, "Move this tracker down in the list.")
+		end)
+		moveDown:SetScript("OnLeave",  function() 
+			BGS_TrackerClasses.tooltip:HideTooltip()
+		end)
 
 		-- create move button 
 		local move = CreateFrame("Button", trackName.."_move", BGS_OptframeDefault)
@@ -1237,12 +1359,10 @@ function BGS_TrackerClasses:createSmallFrame(v)
 			local btnUp, btnDown = parent:GetChildren()
 			-- swap frame between boxes
 			if (v.visipos > 0) then
-				--print(parent:GetName() .. " hidden")
 				HideFrame(move.classRef.frameNr)
 				btnUp:Hide()
 				btnDown:Hide()
 			else
-				--print(parent:GetName() .. " shown")
 				btnUp:Show()
 				btnDown:Show()
 				ShowFrame(move.classRef.frameNr)
@@ -1252,11 +1372,23 @@ function BGS_TrackerClasses:createSmallFrame(v)
 			FixOptionFrames()
 		end)
 		
+		move:SetScript("OnEnter",  function(self) 
+			BGS_TrackerClasses.tooltip:ShowTooltip(self, "Enable or disable this tracker.")
+		end)
+		move:SetScript("OnLeave",  function() 
+			BGS_TrackerClasses.tooltip:HideTooltip()
+		end)
+		
+		
 		return BGS_OptframeDefault
 end
 
 function BGS_TrackerClasses:CreateTrackerFrame(class)
-
+	
+	if #TestClasses >= MAXFRAMES then
+		return
+	end
+	
 	local frame = CreateFrame("frame", "BGS_"..class.detail, BGStatFrame)
 	-- text
 	frame.text = frame:CreateFontString(nil, nil, "GameFontNormal")	
@@ -1332,13 +1464,25 @@ local function RemoveFrame(pos)
 	FixOptionFrames()
 end
 
-local function CreateTrackerOfType(frameType, save)
+local function CreateTrackerOfType(frameType, name ,save)
+
+	if #TestClasses >= MAXFRAMES then
+		return
+	end
 
 	for k, v in ipairs(BGS_TrackerClasses) do
 		if(v.fType == frameType) then
 			_CreatedFrameCounter = _CreatedFrameCounter + 1
 			local count = _CreatedFrameCounter
-			tracker = v.class(v.fType..count, count, save)
+			
+			if name == nil then
+				name = v.fType..count
+			end
+			
+			tracker = v.class(name, count, save)
+			--if save ~= nil then
+			--	tracker:LoadSave(save)
+			--end
 			if tracker.visipos == -1 then
 				tracker.visipos = GetNumShownFrames() + 1
 			end
@@ -1370,11 +1514,11 @@ function BGS_TrackerClasses:CreateDefaultTrackerOptions(class)
 	frameDetail:SetRelativeWidth(0.5)
 	frameDetail:SetHeight(25)
 	frameDetail:SetLayout("Fill")
-	frameDetail.bg = frameDetail.frame:CreateTexture("frameDetail_Tex")
-	frameDetail.bg:SetTexture("Interface\\LFGFRAME\\UI-LFG-SEPARATOR")
-	frameDetail.bg:SetHeight(frameDetail.frame:GetHeight()/2)
-	frameDetail.bg:SetTexCoord(0, 168/256, 0, 34/128)
-	frameDetail.bg:SetPoint("bottom", 0, -2)
+	--frameDetail.bg = frameDetail.frame:CreateTexture("frameDetail_Tex")
+	--frameDetail.bg:SetTexture("Interface\\LFGFRAME\\UI-LFG-SEPARATOR")
+	--frameDetail.bg:SetHeight(frameDetail.frame:GetHeight()/2)
+	--frameDetail.bg:SetTexCoord(0, 168/256, 0, 34/128)
+	--frameDetail.bg:SetPoint("bottom", 0, -2)
 	frameDetail.text = frameDetail.frame:CreateFontString(nil, nil, "GameFontHighlightSmall")
 	frameDetail.text:SetHeight(frameDetail.frame:GetHeight())
 	frameDetail.text:SetText("Tracker type:\n"..class.type)
@@ -1387,9 +1531,9 @@ function BGS_TrackerClasses:CreateDefaultTrackerOptions(class)
 	RemoveButton:SetWidth(32)
 	RemoveButton:SetHeight(32)
 	RemoveButton:SetHitRectInsets(4, 4, 4, 4)
-	RemoveButton:SetNormalTexture("Interface\\BUTTONS\\UI-Panel-MinimizeButton-Up")
-	RemoveButton:SetHighlightTexture("Interface\\BUTTONS\\UI-Panel-MinimizeButton-Highlight")
-	RemoveButton:SetPushedTexture("Interface\\BUTTONS\\UI-Panel-MinimizeButton-Down")
+	RemoveButton:SetNormalTexture("Interface\\BUTTONS\\CancelButton-Up")
+	RemoveButton:SetHighlightTexture("Interface\\BUTTONS\\CancelButton-Highlight")
+	RemoveButton:SetPushedTexture("Interface\\BUTTONS\\CancelButton-Down")
 	RemoveButton:SetPoint("bottomright", frameDetail.frame, "bottomright", -5, 5)
 	--FPS_CloseButton:Show()
 	RemoveButton:SetScript("OnClick",  function() 
@@ -1405,10 +1549,17 @@ function BGS_TrackerClasses:CreateDefaultTrackerOptions(class)
 		
 		if pos ~= -1 then
 			RemoveFrame(pos)
+			SetMaxColums(BGS_TrackerClasses:CountVisibleTrackers(), true)
+			FixOptionFrames()
 		end
 		
-		--table.remove()
-		
+	end)
+	
+	RemoveButton:SetScript("OnEnter",  function(self) 
+		BGS_TrackerClasses.tooltip:ShowTooltip(self, "Remove this tracker.")
+	end)
+	RemoveButton:SetScript("OnLeave",  function() 
+		BGS_TrackerClasses.tooltip:HideTooltip()
 	end)
 	
 	local sl_ColSpan = AceGUI:Create("Slider")
@@ -1423,6 +1574,13 @@ function BGS_TrackerClasses:CreateDefaultTrackerOptions(class)
 		BGS_TrackerClasses:TrackFramePos()
 	end)
 	DEFAULT_TRACKER_OPTIONS.sl_ColSpan = sl_ColSpan
+	
+	sl_ColSpan:SetCallback("OnEnter", function(self, _, value)
+		BGS_TrackerClasses.tooltip:ShowTooltip(self.frame, "Choose the amount of colums the tracker spans.\nThe max size is determined by the number of colums chosen in the misc options slider.")
+	end)
+	sl_ColSpan:SetCallback("OnLeave", function(_, _, value)
+		BGS_TrackerClasses.tooltip:HideTooltip()
+	end)
 
 	ddwn_Align = AceGUI:Create("Dropdown")
 	ddwn_Align:SetRelativeWidth(0.4)
@@ -1500,9 +1658,9 @@ local function _CreateOptionsFrames()
 	BGS_LockButton.tex:SetTexCoord(18/64, 36/64, 37/128, 53/128)
 	BGS_LockButton.tex:SetSize(17,17)
 	BGS_LockButton.tex:SetVertexColor(DEFAULT_LOCKVERTEX_ON, DEFAULT_LOCKVERTEX_ON, DEFAULT_LOCKVERTEX_ON ) 
-	BGS_LockButton:SetScript("OnEnter",  function() 
+	BGS_LockButton:SetScript("OnEnter",  function(self) 
 		BGS_LockButton.tex:SetVertexColor(1, 1, 1 )
-		Text_OptionInfo.text:SetText("Enable/disable frame movement")
+		BGS_TrackerClasses.tooltip:ShowTooltip(self, "Enable/disable frame movement.")
 	end)
 	BGS_LockButton:SetScript("OnLeave",  function() 
 		if BGStatFrame:IsMouseEnabled() then
@@ -1511,6 +1669,7 @@ local function _CreateOptionsFrames()
 			BGS_LockButton.tex:SetVertexColor(DEFAULT_LOCKVERTEX_OFF, DEFAULT_LOCKVERTEX_OFF, DEFAULT_LOCKVERTEX_OFF )
 		end
 		Text_OptionInfo.text:SetText("")
+		BGS_TrackerClasses.tooltip:HideTooltip()
 	end)
 
 -- Show/Hide Button
@@ -1528,9 +1687,9 @@ local function _CreateOptionsFrames()
 	BGS_VisibleButton.tex:SetTexture("Interface\\LFGFRAME\\BattlenetWorking9")
 	BGS_VisibleButton.tex:SetPoint("center", BGS_VisibleButton, "center", 0, 0)
 	BGS_VisibleButton.tex:SetSize(25,25)
-	BGS_VisibleButton:SetScript("OnEnter",  function() 
+	BGS_VisibleButton:SetScript("OnEnter",  function(self) 
 		BGS_VisibleButton.tex:SetTexture("Interface\\LFGFRAME\\BattlenetWorking2")
-		Text_OptionInfo.text:SetText("Show/hide tracking frame.")
+		BGS_TrackerClasses.tooltip:ShowTooltip(self, "Show/hide tracking frame.")
 	end)
 	BGS_VisibleButton:SetScript("OnLeave",  function() 
 		if BGStatFrame:IsShown() then
@@ -1539,6 +1698,7 @@ local function _CreateOptionsFrames()
 			BGS_VisibleButton.tex:SetTexture("Interface\\LFGFRAME\\BattlenetWorking4")
 		end
 		Text_OptionInfo.text:SetText("")
+		BGS_TrackerClasses.tooltip:HideTooltip()
 	end)
 
 -- Button Mouseover Text
@@ -1577,7 +1737,7 @@ local function _CreateOptionsFrames()
 	L_BGS_ListsGroup:SetLayout("Fill")
 	Options_MainScroller:AddChild(L_BGS_ListsGroup)
 
-	local OptionFramesBG = CreateOptionsContainer("OptionFrames", L_BGS_ListsGroup, 340, "Tracker Customisation")
+	local OptionFramesBG = CreateOptionsContainer("OptionFrames", L_BGS_ListsGroup, 375, "Tracker Customisation")
 	
 	OptionFramesBG.divide = OptionFramesBG:CreateTexture("BGS_OptionFrames_D", "BORDER")
 	OptionFramesBG.divide:SetTexture("Interface\\FriendsFrame\\UI-ChannelFrame-VerticalBar", true)
@@ -1638,30 +1798,78 @@ local function _CreateOptionsFrames()
 	BGS_NewTrackerOptions:AddChild(infoEmpty2)
 	
 	local txt_Name = AceGUI:Create("EditBox")
-	txt_Name:SetLabel("Type")
-	txt_Name:SetText(HonorFrame)
+	txt_Name:SetLabel("Name")
 	txt_Name:SetRelativeWidth(0.45)
+	
+	
+	local lbl_frameInfo = AceGUI:Create("SimpleGroup")
+	lbl_frameInfo:SetRelativeWidth(1)
+	lbl_frameInfo:SetHeight(50)
+	lbl_frameInfo:SetLayout("Fill")
+	lbl_frameInfo.text = lbl_frameInfo.frame:CreateFontString(nil, nil, "GameFontHighlightSmall")
+	lbl_frameInfo.text:SetText("")
+	lbl_frameInfo.text:SetPoint("topleft")
+	lbl_frameInfo.text:SetPoint("bottomright")
+	
+	
+	local ddwn_TrackerType_Container = AceGUI:Create("SimpleGroup")
+	--ddwn_Background_Container:SetRelativeWidth(1)
+	ddwn_TrackerType_Container:SetRelativeWidth(0.5)
+	BGS_NewTrackerOptions:AddChild(ddwn_TrackerType_Container)
+	-- put name to the right
 	BGS_NewTrackerOptions:AddChild(txt_Name)
+	
+	
+	for k, v in ipairs(BGS_TrackerClasses)do
+		TrackerTypeList[v.fType] = v.fType
+	end
+	
+	ddwn_TrackerType = AceGUI:Create("Dropdown")
+	ddwn_TrackerType:SetWidth(150)
+	ddwn_TrackerType:SetList(TrackerTypeList)
+	ddwn_TrackerType:SetLabel("Type")
+	ddwn_TrackerType:SetCallback("OnValueChanged", function(_,_, choise)
+		ddwn_TrackerType.choise = choise
+		txt_Name:SetText(choise)
+		for k, v in ipairs(BGS_TrackerClasses) do
+			if v.fType == choise then
+				lbl_frameInfo.text:SetText(v.info)
+				break
+			end
+		end
+		--ChangeBG(choise)
+	end)
+	--ddwn_TrackerType:SetValue(TrackerTypeList[0])
+	ddwn_TrackerType_Container:AddChild(ddwn_TrackerType)
 	
 	local txt_Create = AceGUI:Create("Button")
 	txt_Create:SetText("Create")
 	txt_Create:SetRelativeWidth(0.45)
 	txt_Create:SetCallback("OnClick", function(__,__,value)
 		--local frame = BGS_TrackerClasses:GetFrameByName(class.name)
-		CreateTrackerOfType(txt_Name:GetText())
+		CreateTrackerOfType(ddwn_TrackerType.choise, txt_Name:GetText())
+		ShowTrackerBorders(L_BGS_CBBorders:GetValue())
+		--CreateTrackerOfType(txt_Name:GetText())
 	end)
 	BGS_NewTrackerOptions:AddChild(txt_Create)
+	BGS_NewTrackerOptions:AddChild(lbl_frameInfo)
+	
+	
 	
 	local ShowCreateNewButton = CreateFrame("Button", "BGS_Options_CreateNewTracker", BGS_OptionFramesContainer)
-	--ShowCreateNewButton:SetHitRectInsets(4, 4, 4, 4)
-	--ShowCreateNewButton:SetNormalTexture("Interface\\BUTTONS\\UI-Panel-MinimizeButton-Up")
-	--ShowCreateNewButton:SetHighlightTexture("Interface\\BUTTONS\\UI-Panel-MinimizeButton-Highlight")
-	--ShowCreateNewButton:SetPushedTexture("Interface\\BUTTONS\\UI-Panel-MinimizeButton-Down")
-	ShowCreateNewButton:SetPoint("bottomleft", BGS_OptionFramesContainer, "bottomleft", 0, 0)
-	ShowCreateNewButton:SetPoint("bottomright", BGS_OptionFramesContainer, "bottomright", 0, 0)
-	ShowCreateNewButton:SetHeight(20)
-	--ShowCreateNewButton:SetPoint("bottomright", frameDetail.frame, "bottomright", -5, 5)
-	--FPS_CloseButton:Show()
+	ShowCreateNewButton:SetHitRectInsets(0, 0, 0, 9)
+	ShowCreateNewButton:SetNormalTexture("Interface\\BUTTONS\\UI-DialogBox-Button-Up")
+	ShowCreateNewButton:SetHighlightTexture("Interface\\BUTTONS\\UI-DialogBox-Button-Highlight")
+	ShowCreateNewButton:SetPushedTexture("Interface\\BUTTONS\\UI-DialogBox-Button-Down")
+	ShowCreateNewButton:SetHighlightFontObject(GameFontHighlight)
+	ShowCreateNewButton:SetPoint("bottomleft", BGS_OptionFramesContainer, "bottomleft", 2, -9)
+	ShowCreateNewButton:SetPoint("topright", BGS_OptionFramesContainer, "bottomright", 2, 24)
+	-- Something is off with the text
+	-- ShowCreateNewButton:SetText("Add New")
+	ShowCreateNewButton.text = ShowCreateNewButton:CreateFontString(nil, nil, "GameFontNormal")
+	ShowCreateNewButton.text:SetPoint("topleft")
+	ShowCreateNewButton.text:SetPoint("bottomright",0, 10)
+	ShowCreateNewButton.text:SetText("Add new")
 	ShowCreateNewButton:SetScript("OnClick",  function() 
 		if {BGS_FramesortBG_Info:GetChildren()} ~= nill	then
 				for k, child in ipairs({BGS_FramesortBG_Info:GetChildren()}) do
@@ -1755,6 +1963,26 @@ local function _CreateOptionsFrames()
 	infoDetail.text:SetPoint("left", BGS_Infotext3_Icon2,"right", 5, 0)
 	BGS_OptionDefaultInfo:AddChild(infoDetail)
 	
+	local infoDelete = AceGUI:Create("SimpleGroup")
+	infoDelete:SetLayout("Fill")
+	infoDelete:SetRelativeWidth(0.28)
+	infoDelete.icon1 = infoDelete.frame:CreateTexture("BGS_InfoDelete_Icon1")
+	BGS_InfoDelete_Icon1:SetPoint("topleft", infoDelete.frame , "topleft",0, 0)
+	BGS_InfoDelete_Icon1:SetPoint("bottomright", infoDelete.frame , "topleft",20, -20)
+	BGS_InfoDelete_Icon1:Show()
+	infoDetail.icon2 = infoDetail.frame:CreateTexture("BGS_InfoDelete_Icon2")
+	BGS_InfoDelete_Icon2:SetTexture("Interface\\BUTTONS\\CancelButton-Up")
+	BGS_InfoDelete_Icon2:SetTexCoord(1/5, 4/5, 1/5, 4/5)
+	BGS_InfoDelete_Icon2:SetPoint("topleft", BGS_InfoDelete_Icon1 , "topright",0, 0)
+	BGS_InfoDelete_Icon2:SetPoint("bottomright", BGS_InfoDelete_Icon1 , "topright",20, -20)
+	BGS_InfoDelete_Icon2:Show()
+	infoDelete.text = infoDelete.frame:CreateFontString(nil, nil, FontCheckBox)
+	infoDelete.text:SetText("Remove a tracker from the list by going into\n its options and clicking the remove button.")
+	infoDelete:SetHeight(infoDelete.text:GetHeight()+10);
+	infoDelete.text:SetJustifyH("left")
+	infoDelete.text:SetPoint("left", BGS_InfoDelete_Icon2,"right", 5, 0)
+	BGS_OptionDefaultInfo:AddChild(infoDelete)
+	
 	local infoReset = AceGUI:Create("SimpleGroup")
 	infoReset:SetLayout("Fill")
 	infoReset:SetRelativeWidth(0.28)
@@ -1798,6 +2026,13 @@ local function _CreateOptionsFrames()
 					BGS_OptionDefaultInfo.frame:Show()
 					BGS_FramesortBG_Info.text:SetText("Track Options")
 			
+	end)
+	
+	BGS_trackerInfoInfoButton:SetScript("OnEnter",  function(self) 
+		BGS_TrackerClasses.tooltip:ShowTooltip(self, "Display information.")
+	end)
+	BGS_trackerInfoInfoButton:SetScript("OnLeave",  function() 
+		BGS_TrackerClasses.tooltip:HideTooltip()
 	end)
 	
 	
@@ -1908,9 +2143,15 @@ local L_BGS_MiscGroup = AceGUI:Create("SimpleGroup")
 	L_BGS_SLColumns:SetCallback("OnValueChanged", function(value)
 		_TrackColumns = L_BGS_SLColumns:GetValue()
 		BGS_TrackerClasses:TrackFramePos()
-		--ResizeBG()
 	end)
 	BGS_MiscContainerInner:AddChild(L_BGS_SLColumns)
+	
+	L_BGS_SLColumns:SetCallback("OnEnter", function(self, _, value)
+		BGS_TrackerClasses.tooltip:ShowTooltip(self.frame, "Choose the amount of colums the stacker frame has.\nThe max size is determined by the amount of visible trackers.")
+	end)
+	L_BGS_SLColumns:SetCallback("OnLeave", function(_, _, value)
+		BGS_TrackerClasses.tooltip:HideTooltip()
+	end)
 	
 	
 	local cont_CHrow = AceGUI:Create("SimpleGroup")
@@ -1929,6 +2170,15 @@ local L_BGS_MiscGroup = AceGUI:Create("SimpleGroup")
 	L_BGS_CBBorders:SetCallback("OnValueChanged", function(_, _, value)
 		ShowTrackerBorders(value)
 	end)
+	L_BGS_CBBorders:SetCallback("OnEnter", function(self, _, value)
+		BGS_TrackerClasses.tooltip:ShowTooltip(self.frame, "While the options are open, show borders around the trackers to see their sizes.")
+	end)
+	L_BGS_CBBorders:SetCallback("OnLeave", function(_, _, value)
+		BGS_TrackerClasses.tooltip:HideTooltip()
+	end)
+	
+	
+	
 	BGOptions.CBBorders = L_BGS_CBBorders
 	cont_CHrow:AddChild(L_BGS_CBBorders)
 
@@ -1944,19 +2194,26 @@ local L_BGS_MiscGroup = AceGUI:Create("SimpleGroup")
 	L_BGS_CBHideIcons:SetCallback("OnValueChanged", function(value)
 		if L_BGS_CBHideIcons:GetValue() then
 			PlaySound("igMainMenuOptionCheckBoxOn");
-			for k, v in ipairs(DefaultFrames) do 
-				v.text:SetPoint("left", DEFAULT_TRACKOFFSET_WITH, 0)
+			for k, v in ipairs(TestClasses) do 
+				v.frame.text:SetPoint("left", DEFAULT_TRACKOFFSET_WITH, 0)
 				if v.visipos > 0 then
-					v.icon:Show()
+					v.frame.icon:Show()
 				end
 			end
 		else
 			PlaySound("igMainMenuOptionCheckBoxOff");
-			for k, v in ipairs(DefaultFrames) do 
-				v.text:SetPoint("left", DEFAULT_TRACKOFFSET_WITHOUT, 0)
-				v.icon:Hide()
+			for k, v in ipairs(TestClasses) do 
+				v.frame.text:SetPoint("left", DEFAULT_TRACKOFFSET_WITHOUT, 0)
+				v.frame.icon:Hide()
 			end
 		end
+	end)
+	
+	L_BGS_CBHideIcons:SetCallback("OnEnter", function(self, _, value)
+		BGS_TrackerClasses.tooltip:ShowTooltip(self.frame, "Show or hide the icons on the trackers.")
+	end)
+	L_BGS_CBHideIcons:SetCallback("OnLeave", function(_, _, value)
+		BGS_TrackerClasses.tooltip:HideTooltip()
 	end)
 	
 	
@@ -1976,7 +2233,13 @@ local L_BGS_MiscGroup = AceGUI:Create("SimpleGroup")
 			BGS_FrameTitle:Hide()
 		end
 		BGS_TrackerClasses:TrackFramePos()
-		--ResizeBG()
+	end)
+	
+	L_BGS_CBHideTitle:SetCallback("OnEnter", function(self, _, value)
+		BGS_TrackerClasses.tooltip:ShowTooltip(self.frame, "Show or hide the title and buttons on the top of the tracker frame.")
+	end)
+	L_BGS_CBHideTitle:SetCallback("OnLeave", function(_, _, value)
+		BGS_TrackerClasses.tooltip:HideTooltip()
 	end)
 	
 	
@@ -1997,7 +2260,6 @@ local L_BGS_MiscGroup = AceGUI:Create("SimpleGroup")
 		--	BGS_FrameTitle:Hide()
 		--end
 		--BGS_TrackerClasses:TrackFramePos()
-		--ResizeBG()
 	end)
 		
 
@@ -2050,6 +2312,8 @@ local L_BGS_MiscGroup = AceGUI:Create("SimpleGroup")
 	
 	for k, bg in ipairs(_battlefieldInfo) do
 		local WinrateTextContainer = AceGUI:Create("SimpleGroup")
+		
+		
 		if bg.isHeader then 
 		WinrateTextContainer:SetLayout("Fill")
 		WinrateTextContainer.text = WinrateTextContainer.frame:CreateFontString(nil, nil, FontCheckBox)
@@ -2083,6 +2347,10 @@ local L_BGS_MiscGroup = AceGUI:Create("SimpleGroup")
 			WinrateTextContainer.right:SetDrawLayer(layer, sublayer + 1)
 			WinrateTextContainer.right:SetHeight(WinrateTextContainer.frame:GetHeight())
 			WinrateTextContainer.right:SetPoint("left", WinrateTextContainer.bg, "right", -15,0)
+			
+			WinrateTextContainer.frame:RegisterEvent("PLAYER_ENTERING_WORLD");
+			WinrateTextContainer.frame:SetScript("OnEvent", function() WinrateTextContainer.text:SetText("|cFFFFD100".. bg.name ..":|r " ..BGS_TrackerClasses:BGS_GetWinrateString(bg.name, "full", bg.isRated)) end)
+			
 			_WinrateScroller:AddChild(WinrateTextContainer)
 		else
 			
@@ -2094,6 +2362,9 @@ local L_BGS_MiscGroup = AceGUI:Create("SimpleGroup")
 			WinrateTextContainer.text:SetJustifyH("left")
 			WinrateTextContainer.text:SetPoint("topleft", 5, 0)
 			bg.frame = WinrateTextContainer
+			
+			WinrateTextContainer.frame:RegisterEvent("PLAYER_ENTERING_WORLD");
+			WinrateTextContainer.frame:SetScript("OnEvent", function() WinrateTextContainer.text:SetText("|cFFFFD100".. bg.name ..":|r\n " ..BGS_TrackerClasses:BGS_GetWinrateString(bg.name, "full", bg.isRated)) end)
 		
 			local WinrateIcon = AceGUI:Create("Icon")
 			WinrateIcon:SetImage(bg.icon)
@@ -2103,6 +2374,7 @@ local L_BGS_MiscGroup = AceGUI:Create("SimpleGroup")
 			_WinrateScroller:AddChild(WinrateTextContainer)
 		end
 		
+		
 		WinrateOptionsTable[#WinrateOptionsTable+1] = WinrateTextContainer --save for updating
 	end
 
@@ -2110,6 +2382,14 @@ local L_BGS_MiscGroup = AceGUI:Create("SimpleGroup")
 end
 
 local function Firstrun()
+	for k, v in ipairs(BGS_TrackerClasses)do
+		CreateTrackerOfType(v.fType, v.fType)
+	end
+	
+	for k, v in ipairs(TestClasses) do
+		v.visipos = 0
+	end
+	
 	BGS_firstrunInfo:Show()
 	
 	-- Movable
@@ -2151,76 +2431,74 @@ function BGS_TrackerClasses:GetInfoList(name)
 	return nil
 end
 
-local function CommonRunOLD()
-	if type(BackgroundId) == type({}) then
-		ChangeBG(BackgroundId[2])
-		ddwn_Background:SetValue(BackgroundId[2])
-	end
-	
-	
-
-	SetShowMainframe(IsShown)
-
-	if CanMove == false then
-		BGStatFrame:EnableMouse(false)
-		BGS_LockButton.tex:SetVertexColor(DEFAULT_LOCKVERTEX_OFF, DEFAULT_LOCKVERTEX_OFF, DEFAULT_LOCKVERTEX_OFF )
-		BGS_MoveButton.tex:SetVertexColor(DEFAULT_LOCKVERTEX_OFF, DEFAULT_LOCKVERTEX_OFF, DEFAULT_LOCKVERTEX_OFF )
-	else
-		BGStatFrame:EnableMouse(true)
-		BGS_LockButton.tex:SetVertexColor(DEFAULT_LOCKVERTEX_ON, DEFAULT_LOCKVERTEX_ON, DEFAULT_LOCKVERTEX_ON )
-		BGS_MoveButton.tex:SetVertexColor(DEFAULT_LOCKVERTEX_ON, DEFAULT_LOCKVERTEX_ON, DEFAULT_LOCKVERTEX_ON )
-	end
-	
-	UpdateMainFrameBG()
-	  
-	
-	  
-	if TitleHidden ~= nil and TitleHidden == true then
-		L_BGS_CBHideTitle:SetValue(false)
-		BGS_FrameTitle:Hide()
-	else
-		L_BGS_CBHideTitle:SetValue(true)
-		BGS_FrameTitle:Show()
-	end
-		
-		
-	if IconsHidden ~= nil and IconsHidden == true then
-		L_BGS_CBHideIcons:SetValue(false)
-		for k, v in ipairs(DefaultFrames) do 
-			v.icon:Hide()
-			v.text:SetPoint("left", DEFAULT_TRACKOFFSET_WITHOUT, 0)
-		end	
-	else
-		L_BGS_CBHideIcons:SetValue(true)
-		for k, v in ipairs(DefaultFrames) do 
-			v.icon:Show()
-			v.text:SetPoint("left", DEFAULT_TRACKOFFSET_WITH, 0)
+local function GetOldVisipos(name, save)
+	for k, v in pairs(save.ShownFrames) do
+		if v.name == name then
+			return v.pos
 		end
 	end
 	
-	for  id, name in ipairs(ShownFramesTable) do 
-		local f = BGS_TrackerClasses:GetFrameByName(name)
-		if f == -1 then
-			f = BGS_TrackerClasses:GetFrameByName(RenameOldSave(name))
-		end
-		if f == -1 then
-			print("BGstats: Unknown frame error, please reload the ui (/reload) to fix this issue.")
-			break;
-		end
-		f.visipos = id
-	end
-	Options_PlaceShownFrames()
-	
-	--ddwn_Background:SetValue(tempSavedData.MainframeBackground)
-	
-	if BGstats_ExtraFrameDataList ~= nil then
-	ExtraDataList = BGstats_ExtraFrameDataList
-	end
+	return 0
 end
 
-local function CommonRun()
+local function OldPerFrame(save, extra)
+	local visipos = GetOldVisipos(extra.frame, save)
+	local newTable = {}
 
-	local tempSavedData = BGstats_BaseDataList
+	local name = ""
+	if extra.frame == "AccKillsFrame" then
+		name = "Account Kills"
+	elseif extra.frame == "AchFrame" then
+		name = "Achievement"
+	elseif extra.frame == "FragmentFrame" then
+		name = "Atrifact Fragments"
+	elseif extra.frame == "XPFrame" then
+		name = "BG Experience"
+	elseif extra.frame == "ScoreFrame" then
+		name = "Scoreboard"
+	elseif extra.frame == "KillsFrame" then
+		name = "Honorable Kills"
+	elseif extra.frame == "TBFrame" then
+		name = "Tol Barad"
+	elseif extra.frame == "ConquestFrame" then
+		name = "Conquest Points"
+	elseif extra.frame == "SessionFrame" then
+		name = "Current Session"
+		newTable.wins, newTable.losses = string.match(extra.text, '(%d+) : (%d+)')
+		newTable.logoutTime = extra.logTime
+		newTable.timestamp = extra.timestamp
+		newTable.autoReset = extra.autoReset
+	elseif extra.frame == "Custom" then
+		name = "Custom"
+		newTable.baseString = extra.baseString
+	elseif extra.frame == "GarrisonFrame" then
+		name = "Garrison Resources"
+	elseif extra.frame == "HonorFrame" then
+		name = "Honor Points"
+	end
+	newTable.name = name
+	newTable.type = name
+	newTable.visipos = visipos
+	newTable.colSpan = extra.colSpan
+	newTable.justify = extra.justify
+	return newTable
+end
+
+local function ConvertOldSave(savedata, extra)
+	local tempTable = {}
+	
+	-- Add trackers actually visible
+	for k, v in ipairs(extra) do
+		table.insert(tempTable, OldPerFrame(savedata, v))
+	end
+
+	
+	return tempTable
+end
+
+local function CommonRun(savedata, extra)
+
+	local tempSavedData = savedata
 	ChangeBG(tempSavedData.MainframeBackground) 
 	SetShowMainframe(tempSavedData.MainframeIsShown)
 	
@@ -2229,6 +2507,10 @@ local function CommonRun()
 		_TrackColumns = 1
 	end
 	L_BGS_SLColumns:SetValue(_TrackColumns)
+	
+	for  id, save in ipairs(extra) do 
+		CreateTrackerOfType(save.type, nil, save)
+	end
 	
 	if tempSavedData.MainframeIsMoveable then
 		BGStatFrame:EnableMouse(true)
@@ -2250,28 +2532,23 @@ local function CommonRun()
 	
 	if tempSavedData.IconsHidden ~= nil and tempSavedData.IconsHidden == true then
 		L_BGS_CBHideIcons:SetValue(true)
-		for k, v in ipairs(DefaultFrames) do 
-			v.icon:Show()
-			v.text:SetPoint("left", DEFAULT_TRACKOFFSET_WITH, 0)
+		for k, v in ipairs(TestClasses) do 
+			v.frame.icon:Show()
+			v.frame.text:SetPoint("left", DEFAULT_TRACKOFFSET_WITH, 0)
 		end
 	else
 		L_BGS_CBHideIcons:SetValue(false)
-		for k, v in ipairs(DefaultFrames) do 
-			v.icon:Hide()
-			v.text:SetPoint("left", DEFAULT_TRACKOFFSET_WITHOUT, 0)
+		for k, v in ipairs(TestClasses) do 
+			v.frame.icon:Hide()
+			v.frame.text:SetPoint("left", DEFAULT_TRACKOFFSET_WITHOUT, 0)
 		end	
 		
 	end
-	
-	for  id, save in ipairs(BGstats_ExtraFrameDataList) do 
-		CreateTrackerOfType(save.type, save)
-	end
 
-	
 	ddwn_Background:SetValue(tempSavedData.MainframeBackground)
 	
-	if BGstats_ExtraFrameDataList ~= nil then
-	ExtraDataList = BGstats_ExtraFrameDataList
+	if extra ~= nil then
+	ExtraDataList = extra
 	
 	
 	end
@@ -2293,7 +2570,6 @@ function BGS_LoadFrame:NEUTRAL_FACTION_SELECT_RESULT(loadedAddon)
 end
 
 function BGS_LoadFrame:PLAYER_ENTERING_WORLD(loadedAddon)
-	BGStatFrame:SetPoint("Center", 200, 0)
 	UpdateWinrate()
 end
 
@@ -2301,51 +2577,39 @@ function BGS_LoadFrame:ADDON_LOADED(loadedAddon)
 	if loadedAddon ~= addonName then return end
 	self:UnregisterEvent("ADDON_LOADED")
 	_CreateBaseFrame()
-	
-	--[[for k, v in ipairs(BGS_TrackerClasses)do
-		if (v.class) then
-		local temp = v.class("test1")
-		
-			table.insert(TestClasses, temp)
-			--v.class:Create()
-		end
-	end]]--
-	
-	
-	
-	
-	--InterfaceOptions_AddCategory(BGS_Option)
+
 	self.ADDON_LOADED = nil
 end
 
 
 function BGS_LoadFrame:PLAYER_LOGIN(loadedAddon)
-	
-	
-	
+
 	_CreateOptionsFrames()
-	
-	
-	
+
 	for i=0, table.getn(DefaultFrames) do
 		--HideFrame(i+1)
 	end
 	
-	if BGstats_BaseDataList == nil then -- either no data or old data
-		if firstRun == nil then --not even old data so truely first run
-			Firstrun()
-		else
-			CommonRunOLD()
-		end
+	local savedata = BGstats_BaseDataList
+	local extra = BGstats_ExtraFrameDataList
+	
+	if savedata == {} then -- either no data or old data
+		Firstrun()                                                                                                                             
 	else
-		CommonRun()
-	end
-	
-	--ResizeBG()
-    --BGS_TrackerClasses:TrackFramePos()
-	
-	for k, v in ipairs(TestClasses) do
-		print("before fix".. v.detail.." "..v.visipos)
+		if savedata.Version < "6.1.02" then
+			extra = ConvertOldSave(savedata, extra)  
+		end
+		-- for k1, v1 in pairs(tempTable) do
+		-- for k, v in pairs(v1) do
+			-- if	type(v) == "boolean" then
+				-- print(k .. " - " .. (v and 1 or 0))
+			-- else
+				-- print(k .. " - " .. v)
+			-- end
+			
+		-- end		
+	-- end
+		CommonRun(savedata, extra)
 	end
 	
 	FixOptionFrames()
@@ -2365,6 +2629,35 @@ function BGS_LoadFrame:PLAYER_LOGOUT(loadedAddon)
 	tempSaveData.IconsHidden = L_BGS_CBHideIcons:GetValue()
 	tempSaveData.TrackColumns = _TrackColumns
 	tempSaveData.Version = versionNr
+	
+	-- Saving winrates
+	local winrates = {}
+	winrates.battleground = {}
+	winrates.arena = {}
+	winrates.ratedbattleground = {}
+	for k, bg in ipairs(_battlefieldInfo) do
+		local winrate = {}
+		if bg.isHeader then
+			winrate.name = "total"
+		else
+			winrate.name = bg.name
+		end
+			winrate.wins = BGS_TrackerClasses:BGS_GetWinrateString(bg.name, "wins", bg.isRated)
+			winrate.losses = BGS_TrackerClasses:BGS_GetWinrateString(bg.name, "losses", bg.isRated)
+		
+		if bg.instanceType == "arena"then
+			table.insert(winrates.arena, winrate)
+		else
+			if bg.isRated then
+				table.insert(winrates.ratedbattleground, winrate)
+			else
+				table.insert(winrates.battleground, winrate)
+			end
+		end
+	end
+	tempSaveData.winrates = winrates
+	
+	
 	
 	local tempTable = {}
 	
@@ -2391,14 +2684,6 @@ local function slashcmd(msg, editbox)
 		SetShowMainframe(true)
 	elseif msg == 'lock' then
 		ToggleLockbutton()
-	elseif msg == 'create' then
-		--table.foreach(TestClasses,print)
-		
-		for k, v in ipairs(BGS_TrackerClasses)do
-			CreateTrackerOfType(v.fType)
-
-		end
-		
 	else
 		if ( not InterfaceOptionsFramePanelContainer.displayedPanel ) then
 			InterfaceOptionsFrame_OpenToCategory(CONTROLS_LABEL);
@@ -2416,7 +2701,7 @@ SlashCmdList["PVPSTATS"] = slashcmd
 
 -- Debug help
 ----------------------------------------------
-
+--[[
 local _updateTimer = 0
 
 function debug_updatext()
@@ -2473,12 +2758,12 @@ BGS_DEBUG:Show()
 
 local function DebugToggleLockbutton() 
 	if BGS_DEBUG:IsMouseEnabled() then
-		FPS_MoveButton.tex:SetVertexColor(DEFAULT_LOCKVERTEX_OFF, DEFAULT_LOCKVERTEX_OFF, DEFAULT_LOCKVERTEX_OFF )
+		BGS_DEBUG_MoveButton.tex:SetVertexColor(DEFAULT_LOCKVERTEX_OFF, DEFAULT_LOCKVERTEX_OFF, DEFAULT_LOCKVERTEX_OFF )
 		PlaySound("igMainMenuOptionCheckBoxOff");
 		BGS_DEBUG:EnableMouse(false)
 			
 	else	
-		FPS_MoveButton.tex:SetVertexColor(DEFAULT_LOCKVERTEX_ON, DEFAULT_LOCKVERTEX_ON, DEFAULT_LOCKVERTEX_ON )
+		BGS_DEBUG_MoveButton.tex:SetVertexColor(DEFAULT_LOCKVERTEX_ON, DEFAULT_LOCKVERTEX_ON, DEFAULT_LOCKVERTEX_ON )
 		PlaySound("igMainMenuOptionCheckBoxOn");
 		BGS_DEBUG:EnableMouse(true)
 			
@@ -2489,7 +2774,7 @@ end
 local L_BGS_DEBUG_MoveButton = CreateFrame("Button", "BGS_DEBUG_MoveButton", BGS_DEBUG)
 BGS_DEBUG_MoveButton:SetWidth(8)
 BGS_DEBUG_MoveButton:SetHeight(8)
-BGS_DEBUG_MoveButton.tex = BGS_DEBUG_MoveButton:CreateTexture("FPS_MoveButton_Tex")
+BGS_DEBUG_MoveButton.tex = BGS_DEBUG_MoveButton:CreateTexture("BGS_DEBUG_MoveButton_Tex")
 BGS_DEBUG_MoveButton.tex:SetTexture("Interface\\COMMON\\UI-ModelControlPanel")
 BGS_DEBUG_MoveButton.tex:SetPoint("topleft", BGS_DEBUG, "topleft", 5, -5)
 BGS_DEBUG_MoveButton.tex:SetTexCoord(18/64, 36/64, 37/128, 53/128)
@@ -2507,3 +2792,4 @@ BGS_DEBUG_MoveButton:SetScript("OnEnter",  function()
 	BGS_DEBUG_MoveButton.tex:SetVertexColor(1, 1, 1 )
 	
 end)
+]]--

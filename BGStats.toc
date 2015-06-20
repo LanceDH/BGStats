@@ -12,3 +12,12 @@ BGStats.lua
 Trackers\HonorFrame.lua
 Trackers\Custom.lua
 Trackers\AccKillsFrame.lua
+Trackers\AchFrame.lua
+Trackers\ConquestFrame.lua
+Trackers\FragmentFrame.lua
+Trackers\GarrisonFrame.lua
+Trackers\KillsFrame.lua
+Trackers\ScoreFrame.lua
+Trackers\TBFrame.lua
+Trackers\XPFrame.lua
+Trackers\SessionFrame.lua

@@ -15,9 +15,8 @@ setmetatable(TestClass, {
 })
 
 local _type = "Account Kills"
-
-table.insert(BGS_TrackerClasses, {fType = _type, class = TestClass })
--- Tracker Specific variables
+local info = "Honorable kills across your account (250k limit)"
+table.insert(BGS_TrackerClasses, {fType = _type, class = TestClass, info = info })
 
 
 --------------------------------------------------------------------------------
@@ -56,18 +55,10 @@ local function CreateSpecificOptions(class)
 	
 	
 	scroll:AddChild(class._defaultOPtions.txt_Name)
-
-	-- Tracker Info
-	--class._defaultOPtions.frameDetail.text:SetText(class.info)
 	scroll:AddChild(class._defaultOPtions.frameDetail)
-	
-	-- Tracker Slider
-	
 	scroll:AddChild(class._defaultOPtions.sl_ColSpan)
-	
-	-- Tracker Text Alignment
-	
 	scroll:AddChild(class._defaultOPtions.ddwn_Align)
+	class._defaultOPtions.ddwn_Align:SetText(class.justify)
 	
 	return scrollcontainer
 end
@@ -125,44 +116,6 @@ function TestClass:SetColspan(cols, maxCols)
 	self._defaultOPtions.sl_ColSpan:SetSliderValues(1, maxCols, 1)
 	self._defaultOPtions.sl_ColSpan:SetValue(self.colSpan)
 end
-
---[[
-local function CreateSpecificOptions()
-
-	local scrollcontainer = AceGUI:Create("SimpleGroup")
-	scrollcontainer:SetFullWidth(true)
-	scrollcontainer:SetWidth(185)
-	scrollcontainer:SetFullHeight(true)
-	scrollcontainer:SetHeight(170)
-	scrollcontainer:SetLayout("Fill")
-
-	table.insert(TrackerClass.options, scrollcontainer)
-
-	local scroll = AceGUI:Create("ScrollFrame")
-	scroll:SetLayout("Flow") 
-	scrollcontainer:AddChild(scroll)
-
-	-- Tracker Info
-	_defaultOPtions.frameDetail.text:SetText(TrackerClass.info)
-	scroll:AddChild(_defaultOPtions.frameDetail)
-	
-	-- Tracker Slider
-	_defaultOPtions.sl_ColSpan:SetCallback("OnValueChanged", function(__,__,value)
-		local frame = BGS_TrackerClasses:GetFrameByName(TrackerClass.name)
-		frame.colSpan = tonumber(value)
-		BGS_TrackerClasses:TrackFramePos()
-	end)
-	scroll:AddChild(_defaultOPtions.sl_ColSpan)
-	
-	-- Tracker Text Alignment
-	_defaultOPtions.ddwn_Align:SetCallback("OnValueChanged", function(_,_, choise)
-		TrackerClass.justify = choise
-		TrackerClass.frame.text:SetJustifyH(TrackerClass.justify)
-	end)
-	scroll:AddChild(_defaultOPtions.ddwn_Align)
-	
-end
-]]--
 
 
 --------------------------------------------------------------------------------

@@ -6,35 +6,23 @@
 -- General Tracker variables
 local AceGUI = LibStub("AceGUI-3.0")
 local addonName, BGS_TrackerClasses = ...
-local TestClass = {}
-TestClass.__index = TestClass
-setmetatable(TestClass, {
+local TrackerClass = {}
+TrackerClass.__index = TrackerClass
+setmetatable(TrackerClass, {
   __call = function (cls, ...)
     return cls.new(...)
   end,
 })
 
-local _type = "HonorFrame"
-
-local TrackerClass = {}
-TrackerClass.name = "HonorFrame"
-TrackerClass.detail = "Honor Points"
-TrackerClass.icon = "Interface\\ICONS\\INV_Misc_QuestionMark"
-TrackerClass.info = "Amount of honor points on this character"
---TrackerClass.options = {}
-TrackerClass.colSpan = 1
-TrackerClass.justify = "left"
-TrackerClass.frame = nil
---local _defaultOPtions = BGS_TrackerClasses:CreateDefaultTrackerOptions()
-table.insert(BGS_TrackerClasses, {fType = _type, class = TestClass })
--- Tracker Specific variables
+local _type = "Honor Points"
+local info = "Amount of honor points on this character"
+table.insert(BGS_TrackerClasses, {fType = _type, class = TrackerClass, info = info})
 
 --------------------------------------------------------------------------------
 -- General Tracker Methods
 --------------------------------------------------------------------------------
 
 local function UpdateHonorInfo(frame)
-	--local frame = BGS_TrackerClasses:GetFrameByName(TrackerClass.name)
 	frame.text:SetText(BGS_TrackerClasses:GetHonor())
 end
 
@@ -53,10 +41,7 @@ local function HonorIcon(frame)
 end
 
 local function eventHandle(class, self, event, addon)
-	--if not (BGS_TrackerClasses:GetFrameByName(TrackerClass.name)) then
-	--	return
-	--end
-	
+
 	if event == "CURRENCY_DISPLAY_UPDATE" then
 		UpdateHonorInfo(class.frame)
 	return
@@ -92,26 +77,18 @@ local function CreateSpecificOptions(class)
 	
 	
 	scroll:AddChild(class._defaultOPtions.txt_Name)
-
-	-- Tracker Info
-	--class._defaultOPtions.frameDetail.text:SetText(class.info)
 	scroll:AddChild(class._defaultOPtions.frameDetail)
-	
-	-- Tracker Slider
-	
 	scroll:AddChild(class._defaultOPtions.sl_ColSpan)
-	
-	-- Tracker Text Alignment
-	
 	scroll:AddChild(class._defaultOPtions.ddwn_Align)
+	class._defaultOPtions.ddwn_Align:SetText(class.justify)
 	
 	return scrollcontainer
 end
 
 
 
-function TestClass.new(name, id, save)
-  local self = setmetatable({}, TestClass)
+function TrackerClass.new(name, id, save)
+  local self = setmetatable({}, TrackerClass)
 	self.name = name
 	self.detail = "frame_"..id
 	self.icon = "Interface\\ICONS\\INV_Misc_QuestionMark"
@@ -126,18 +103,14 @@ function TestClass.new(name, id, save)
 	if save ~= nil then
 		self:LoadSave(save)
 	end
-	
-	print("creating".. self.detail.." "..self.visipos)
-	
+
 	self.frame = BGS_TrackerClasses:CreateTrackerFrame(self)
-	print("after frame "..self.visipos)
 	self.optionFrame = BGS_TrackerClasses:createSmallFrame(self)
 	
 	UpdateHonorInfo(self.frame)
 	HonorIcon(self.frame)
 	
 	self._defaultOPtions = BGS_TrackerClasses:CreateDefaultTrackerOptions(self)
-	--CreateSpecificOptions(self)
 	
 	table.insert(self.options, CreateSpecificOptions(self))
 	
@@ -147,7 +120,7 @@ function TestClass.new(name, id, save)
 end
 
 
-function TestClass:GetSave()
+function TrackerClass:GetSave()
 	local save = {}
 	save.name = self.name
 	save.visipos = self.visipos
@@ -158,29 +131,15 @@ function TestClass:GetSave()
 	return save
 end
 
-function TestClass:LoadSave(save)
+function TrackerClass:LoadSave(save)
 	self.name = save.name
 	self.visipos = save.visipos
 	self.colSpan = save.colSpan
 	self.justify = save.justify
 end
 
-function TestClass:SetColspan(cols, maxCols)
+function TrackerClass:SetColspan(cols, maxCols)
 	self.colSpan = cols
 	self._defaultOPtions.sl_ColSpan:SetSliderValues(1, maxCols, 1)
 	self._defaultOPtions.sl_ColSpan:SetValue(self.colSpan)
 end
-
-
---------------------------------------------------------------------------------
--- Tracker Specific Methods
---------------------------------------------------------------------------------
-		
-
-
-
-
---------------------------------------------------------------------------------
--- Event Handling
---------------------------------------------------------------------------------
-

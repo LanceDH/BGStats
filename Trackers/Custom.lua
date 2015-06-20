@@ -6,32 +6,20 @@
 -- General Tracker variables
 local AceGUI = LibStub("AceGUI-3.0")
 local addonName, BGS_TrackerClasses = ...
-local TestClass = {}
-TestClass.__index = TestClass
-setmetatable(TestClass, {
+local TrackerClass = {}
+TrackerClass.__index = TrackerClass
+setmetatable(TrackerClass, {
   __call = function (cls, ...)
     return cls.new(...)
   end,
 })
 
 local _type = "Custom"
-
-local TrackerClass = {}
-TrackerClass.name = "Custom"
-TrackerClass.detail = "Custom"
-TrackerClass.icon = "Interface\\ICONS\\INV_Scroll_07"
-TrackerClass.info = "Customise your own tracker using given options"
-TrackerClass.options = {}
-TrackerClass.colSpan = 1
-TrackerClass.justify = "left"
-TrackerClass.frame = nil
---local _defaultOPtions = BGS_TrackerClasses:CreateDefaultTrackerOptions()
-table.insert(BGS_TrackerClasses, {fType = _type, class = TestClass })
---table.insert(BGS_TrackerClasses, {class = TrackerClass})
--- Tracker Specific variables
+local info = "Customise your own tracker using given options"
+table.insert(BGS_TrackerClasses, {fType = _type, class = TrackerClass, info = info})
 
 local _replaceKeys = { {key ="Misc", value = "", header = true, info="Misc options"}
-						,{key ="$hk1", value = function() return BGS_TrackerClasses:GetHKills()end, info="Character honorable kills"}--BGS_TrackerClasses:GetHKills()
+						,{key ="$hk1", value = function() return BGS_TrackerClasses:GetHKills()end, info="Character honorable kills"}
 						,{key ="$hk2", value = function() return BGS_TrackerClasses:GetAccHKills() end, info="Account honorable kills"}
 						,{key ="$cur1", value = function() return BGS_TrackerClasses:GetHonor() end, info="Honor points"}
 						,{key ="$cur2", value = function() return BGS_TrackerClasses:GetConquest() end, info="Conquest points"}
@@ -47,9 +35,9 @@ local _replaceKeys = { {key ="Misc", value = "", header = true, info="Misc optio
 						,{key ="$cap8", value = function() return BGS_TrackerClasses:GetConquestcap("random", true) end, info="Weekly random BG conquest point cap"}
 						--,{key ="$cur(#)", value = function(input) print("you used:" ..input); return BGS_TrackerClasses:GetConquest() end, info="Custom currency where # = currency id"}
 						,{key ="WinRates", value = "", header = true, info="Winrate options"}
-						,{key = "$wrbf1", value = function() return BGS_TrackerClasses:BGS_GetWinrateString(_currentBG, "full", IsRatedBattleground()) end, info="Current Battlefield shown as w : l (%)"}
-						,{key = "$wrbf2", value = function() return BGS_TrackerClasses:BGS_GetWinrateString(_currentBG, "games", IsRatedBattleground()) end, info="Current Battlefield shown as w : l"}
-						,{key = "$wrbf3", value = function() return BGS_TrackerClasses:BGS_GetWinrateString(_currentBG, "rate", IsRatedBattleground()) end, info="Current Battlefield shown as %"}
+						,{key = "$wrbf1", value = function() return BGS_TrackerClasses:BGS_GetWinrateString(GetInstanceInfo(), "full", IsRatedBattleground()) end, info="Current Battlefield shown as w : l (%)"}
+						,{key = "$wrbf2", value = function() return BGS_TrackerClasses:BGS_GetWinrateString(GetInstanceInfo(), "games", IsRatedBattleground()) end, info="Current Battlefield shown as w : l"}
+						,{key = "$wrbf3", value = function() return BGS_TrackerClasses:BGS_GetWinrateString(GetInstanceInfo(), "rate", IsRatedBattleground()) end, info="Current Battlefield shown as %"}
 						,{key = "$wrbg1", value = function() return BGS_TrackerClasses:BGS_GetWinrateString("Random Battlegrounds", "full") end, info="Total random BG shown as w : l (%)"}
 						,{key = "$wrbg2", value = function() return BGS_TrackerClasses:BGS_GetWinrateString("Random Battlegrounds", "games") end, info="Total random BG shown as w : l"}
 						,{key = "$wrbg3", value = function() return BGS_TrackerClasses:BGS_GetWinrateString("Random Battlegrounds", "rate") end, info="Total random BG shown as %"}
@@ -113,8 +101,8 @@ local function eventHandle(class, self, event, addon)
 	
 	if event == "UPDATE_BATTLEFIELD_SCORE" then
 		-- only update when actually shown to save memory in battlegrounds
-		if TrackerClass.frame:IsShown() then
-			class:updateKeyString()
+		if class.frame:IsShown() then
+			--class:updateKeyString()
 		end
 	end
 	
@@ -135,6 +123,11 @@ local function eventHandle(class, self, event, addon)
 		return
 	end
 	
+	if event == "PLAYER_DEAD" then
+		class:updateKeyString()
+		return
+	end
+	
 	if event == "CURRENCY_DISPLAY_UPDATE" then
 		class:updateKeyString()
 	end
@@ -147,6 +140,7 @@ local function CreateUpdateFrame(class)
 	_eventsFrame:RegisterEvent("PLAYER_PVP_KILLS_CHANGED");
 	_eventsFrame:RegisterEvent("PLAYER_ENTERING_WORLD");
 	_eventsFrame:RegisterEvent("CURRENCY_DISPLAY_UPDATE");
+	_eventsFrame:RegisterEvent("PLAYER_DEAD");
 	_eventsFrame:SetScript("OnEvent", function(self, event, ...) eventHandle(class, self, event, ...) end)
 end
 
@@ -159,9 +153,6 @@ local function CreateSpecificOptions(class)
 	scrollcontainer:SetHeight(170)
 	scrollcontainer:SetLayout("Fill")
 
-	--TrackerClass.options[#TrackerClass.options + 1] = scrollcontainer
-	--table.insert(TrackerClass.options, scrollcontainer)
-
 	local scroll = AceGUI:Create("ScrollFrame")
 	scroll:SetLayout("Flow")
 	scrollcontainer:AddChild(scroll)
@@ -170,6 +161,7 @@ local function CreateSpecificOptions(class)
 	scroll:AddChild(class._defaultOPtions.frameDetail)
 	scroll:AddChild(class._defaultOPtions.sl_ColSpan)
 	scroll:AddChild(class._defaultOPtions.ddwn_Align)
+	class._defaultOPtions.ddwn_Align:SetText(class.justify)
 
 	local txt_Input = AceGUI:Create("EditBox")
 	txt_Input:SetLabel("Custom text")
@@ -177,10 +169,8 @@ local function CreateSpecificOptions(class)
 	txt_Input:SetFullWidth(true)
 	txt_Input:SetCallback("OnTextChanged", function(__,__, value)
 		class._baseString = value
-		--print(value)
 		class:updateKeyString()
 	end)
-	--self.options.txt_Input = txt_Input
 	scroll:AddChild(txt_Input)
 	
 	local countForBg = 0
@@ -198,10 +188,8 @@ local function CreateSpecificOptions(class)
 		
 		local presetDetail = ""
 		if not v.header then
-			--presetDetail = string.format(_keyFormat, v.key, v.info) -- presetDetail .. "|cFFFFCC00".. v.key .. "|r: " .. v.info
 			
 			if countForBg%2 == 0 then
-				--info_KeyDiscriptions.bg:SetTexture("Interface\\CHARACTERFRAME\\UI-Party-Background")
 				info_KeyDiscriptions.bg:SetTexture("Interface\\CHATFRAME\\CHATFRAMEBACKGROUND")
 				info_KeyDiscriptions.bg:SetAlpha(0.05)
 			end
@@ -216,9 +204,6 @@ local function CreateSpecificOptions(class)
 			countForBg = countForBg + 1
 		else
 			
-			--info_KeyDiscriptions.bg:SetTexture("Interface\\PVPFrame\\PvPMegaQueue")
-			--info_KeyDiscriptions.bg:SetTexCoord(6/512, 296/512, 898/1024, 945/1024)
-			--info_KeyDiscriptions.bg:SetTexCoord(0/512, 328/512, 590/1024, 634/1024)
 			info_KeyDiscriptions.bg:SetTexture("Interface\\PLAYERACTIONBARALT\\STONE")
 			info_KeyDiscriptions.bg:SetTexCoord(0, 1, 89/512, 183/512)
 			countForBg = 0
@@ -234,9 +219,7 @@ local function CreateSpecificOptions(class)
 
 			
 			scroll:AddChild(testcontainer)
-			
-			--testcontainer:SetHeight(170)
-			--testcontainer:SetAutoAdjustHeight(false)
+
 		end
 	end
 	
@@ -245,8 +228,8 @@ local function CreateSpecificOptions(class)
 end
 
 
-function TestClass.new(name, id, save)
-  local self = setmetatable({}, TestClass)
+function TrackerClass.new(name, id, save)
+  local self = setmetatable({}, TrackerClass)
 	self.name = name
 	self.detail = "frame_"..id
 	self.icon = "Interface\\ICONS\\INV_Scroll_07"
@@ -265,10 +248,8 @@ function TestClass.new(name, id, save)
 	if save ~= nil then
 		self:LoadSave(save)
 	end
-	print("creating".. self.detail.." "..self.visipos)
 	
 	self.frame = BGS_TrackerClasses:CreateTrackerFrame(self)
-	print("after frame "..self.visipos)
 	self.optionFrame = BGS_TrackerClasses:createSmallFrame(self)
 	
 	self._defaultOPtions = BGS_TrackerClasses:CreateDefaultTrackerOptions(self)
@@ -281,7 +262,7 @@ function TestClass.new(name, id, save)
   return self
 end
 
-function TestClass:GetSave()
+function TrackerClass:GetSave()
 	local save = {}
 	save.name = self.name
 	save.visipos = self.visipos
@@ -293,7 +274,7 @@ function TestClass:GetSave()
 	return save
 end
 
-function TestClass:LoadSave(save)
+function TrackerClass:LoadSave(save)
 	self.name = save.name
 	self.visipos = save.visipos
 	self.colSpan = save.colSpan
@@ -301,18 +282,15 @@ function TestClass:LoadSave(save)
 	self._baseString = save.baseString
 end
 
-function TestClass:SetColspan(cols, maxCols)
+function TrackerClass:SetColspan(cols, maxCols)
 	self.colSpan = cols
 	self._defaultOPtions.sl_ColSpan:SetSliderValues(1, maxCols, 1)
 	self._defaultOPtions.sl_ColSpan:SetValue(self.colSpan)
 end
 
-
-
-function TestClass:updateKeyString()
+function TrackerClass:updateKeyString()
 
 	local tempString = self._baseString
-	--print(self.name .. ": " .. tempString)
 	local strgsub = string.gsub
 	local strfind = string.find
 	
@@ -327,13 +305,6 @@ function TestClass:updateKeyString()
 	tempString = nil
 end	
 
-
---------------------------------------------------------------------------------
--- Tracker Specific Methods
---------------------------------------------------------------------------------
-
-
-
 local function SetKey(key, data)
 	for k, v in ipairs(_replaceKeys) do
 		if v.key == key then
@@ -342,9 +313,3 @@ local function SetKey(key, data)
 		end
 	end
 end
-	
---------------------------------------------------------------------------------
--- Event Handling
---------------------------------------------------------------------------------
-
-
