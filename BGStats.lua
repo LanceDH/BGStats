@@ -2406,7 +2406,9 @@ local function Firstrun()
 	-- Movable
 	SetShowMainframe(true)
 	BGStatFrame:EnableMouse(true)
-			
+	BGStatFrame:SetPoint("center", UIParent, "center", 200, 0)
+	BGStatFrame:Show()
+	
 	BGS_LockButton.tex:SetVertexColor(DEFAULT_LOCKVERTEX_ON, DEFAULT_LOCKVERTEX_ON, DEFAULT_LOCKVERTEX_ON )
 	BGStatFrame:SetBackdrop({
 		bgFile = mainBGBack,
@@ -2604,7 +2606,7 @@ function BGS_LoadFrame:PLAYER_LOGIN(loadedAddon)
 	local savedata = BGstats_BaseDataList
 	local extra = BGstats_ExtraFrameDataList
 	
-	if savedata == {} then -- either no data or old data
+	if savedata == nil or savedata == {} then -- either no data or old data
 		Firstrun()                                                                                                                             
 	else
 		if savedata.Version < "6.1.02" then
