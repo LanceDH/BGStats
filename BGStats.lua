@@ -714,6 +714,7 @@ local function _CreateBaseFrame()
 		UpdateMainFrameBG()
 	BGStatFrame:SetWidth(DEFAULT_TRACKER_WIDTH * _TrackColumns)
 	BGStatFrame:SetHeight(300)
+	BGStatFrame:SetPoint("center", UIParent, "center", 300, 0)
 	BGStatFrame:SetMovable(true)
 	BGStatFrame:RegisterForDrag("LeftButton")
 	BGStatFrame:SetScript("OnDragStart", BGStatFrame.StartMoving )
@@ -2515,6 +2516,12 @@ local function CommonRun(savedata, extra)
 	ChangeBG(tempSavedData.MainframeBackground) 
 	SetShowMainframe(tempSavedData.MainframeIsShown)
 	
+	-- set previous position, if for older versions
+	if(savedata.pos ~= nil) then
+		BGStatFrame:ClearAllPoints();
+		BGStatFrame:SetPoint(savedata.pos.anchor, UIParent, savedata.pos.anchor, savedata.pos.x, savedata.pos.y)
+	end
+	
 	_TrackColumns = tempSavedData.TrackColumns
 	if _TrackColumns == nil then
 		_TrackColumns = 1
@@ -2642,6 +2649,12 @@ function BGS_LoadFrame:PLAYER_LOGOUT(loadedAddon)
 	tempSaveData.IconsHidden = L_BGS_CBHideIcons:GetValue()
 	tempSaveData.TrackColumns = _TrackColumns
 	tempSaveData.Version = versionNr
+	
+	tempSaveData.pos = {}
+	local point, _, _, xOffset, yOffset = BGStatFrame:GetPoint(1)
+	tempSaveData.pos.x = xOffset
+	tempSaveData.pos.y = yOffset
+	tempSaveData.pos.anchor = point
 	
 	-- Saving winrates
 	local winrates = {}

@@ -2,7 +2,7 @@
 ## Title: BGStats
 ## Notes: Track PvP related stats.
 ## Author: LanceDH
-## Version: 6.2.01
+## Version: 6.2.02
 ## OptionalDeps: Ace3
 ## SavedVariablesPerCharacter: BGstats_BaseDataList, BGstats_ExtraFrameDataList
 BGStats.xml
